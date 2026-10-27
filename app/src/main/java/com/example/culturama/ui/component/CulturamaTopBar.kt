@@ -36,7 +36,8 @@ fun CulturamaTopBar(
     onCompaniesClick: () -> Unit,
     onLoginClick: () -> Unit,
     onSignUpClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onPreferencesClick: () -> Unit = {}
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
 
@@ -117,6 +118,7 @@ fun CulturamaTopBar(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 NavMenuItem("Eventos",           onEventsClick)     { menuExpanded = false }
+                NavMenuItem("Meus Interesses",   onPreferencesClick){ menuExpanded = false }
                 NavMenuItem("Mapa",              onMapClick)        { menuExpanded = false }
                 NavMenuItem("Para organizadores",onOrganizersClick) { menuExpanded = false }
                 NavMenuItem("Para empresas",     onCompaniesClick)  { menuExpanded = false }

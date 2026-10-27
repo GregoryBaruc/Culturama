@@ -9,6 +9,7 @@ import androidx.navigation.navArgument
 import com.example.culturama.ui.screen.AccessScreen
 import com.example.culturama.ui.screen.HomeScreen
 import com.example.culturama.ui.screen.LoginScreen
+import com.example.culturama.ui.screen.PreferencesScreen
 import com.example.culturama.ui.screen.SignUpScreen
 
 @Composable
@@ -38,6 +39,9 @@ fun CulturamaNavGraph(navController: NavHostController) {
         }
         composable(Screen.SignUp.route) {
             SignUpScreen(navController = navController)
+        }
+        composable(Screen.Preferences.route) {
+            PreferencesScreen(navController = navController)
         }
     }
 }

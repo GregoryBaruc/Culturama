@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.culturama.data.auth.AuthResult
 import com.example.culturama.data.auth.DemoAuthService
+import com.example.culturama.data.preference.UserPreferencesRepository
 import com.example.culturama.data.validation.FormValidator
 import com.example.culturama.navigation.Screen
 import com.example.culturama.ui.component.*
@@ -57,6 +59,8 @@ fun SignUpScreen(
     navController: NavController,
     authService: DemoAuthService = remember { DemoAuthService.instance }
 ) {
+    val context = LocalContext.current
+    val preferencesRepository = remember { UserPreferencesRepository.getInstance(context) }
     val coroutineScope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
@@ -82,7 +86,6 @@ fun SignUpScreen(
     // ── Estado do processo ──────────────────────────────────────────────
     var isLoading by remember { mutableStateOf(false) }
     var successMessage by remember { mutableStateOf<String?>(null) }
-    var showTermsDialog by remember { mutableStateOf(false) }
 
     // ── Função de submissão do formulário ────────────────────────────────
     fun handleSubmit() {
@@ -266,9 +269,15 @@ fun SignUpScreen(
                                     val res = authService.loginWithGoogle()
                                     isLoading = false
                                     if (res is AuthResult.Success) {
-                                        navController.navigate(Screen.Home.route) {
-                                            popUpTo(Screen.Home.route) { inclusive = false }
-                                            launchSingleTop = true
+                                        if (!preferencesRepository.isPreferencesConfigured()) {
+                                            navController.navigate(Screen.Preferences.route) {
+                                                popUpTo(Screen.SignUp.route) { inclusive = true }
+                                            }
+                                        } else {
+                                            navController.navigate(Screen.Home.route) {
+                                                popUpTo(Screen.Home.route) { inclusive = false }
+                                                launchSingleTop = true
+                                            }
                                         }
                                     }
                                 }
@@ -518,7 +527,7 @@ fun SignUpScreen(
 
                         // Aviso demonstrativo TCC
                         Text(
-                            text = "🔧 Etapa 2 · Demonstração de interface para TCC ADS",
+                            text = "🔧 Etapa 3 · Demonstração de interface para TCC ADS",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = TextTertiary.copy(alpha = 0.6f),
                                 fontSize = 11.sp

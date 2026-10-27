@@ -5,9 +5,10 @@ package com.example.culturama.navigation
  * Centralizadas para manter uma arquitetura escalável e desacoplada.
  */
 sealed class Screen(val route: String) {
-    object Home   : Screen("home")
-    object Access : Screen("access")
-    object Login  : Screen("login") {
+    object Home        : Screen("home")
+    object Access      : Screen("access")
+    object Preferences : Screen("preferences")
+    object Login       : Screen("login") {
         fun createRoute(registeredEmail: String? = null): String {
             return if (!registeredEmail.isNullOrBlank()) {
                 "login?email=$registeredEmail"
@@ -16,5 +17,5 @@ sealed class Screen(val route: String) {
             }
         }
     }
-    object SignUp : Screen("signup")
+    object SignUp      : Screen("signup")
 }

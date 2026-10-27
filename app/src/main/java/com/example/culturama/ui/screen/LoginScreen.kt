@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -31,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.culturama.data.auth.AuthResult
 import com.example.culturama.data.auth.DemoAuthService
+import com.example.culturama.data.preference.UserPreferencesRepository
 import com.example.culturama.data.validation.FormValidator
 import com.example.culturama.navigation.Screen
 import com.example.culturama.ui.component.*
@@ -41,15 +43,9 @@ import kotlinx.coroutines.launch
 /**
  * Tela de Login de Usuário Comum.
  *
- * Reproduz fielmente a identidade visual do Culturama:
- * - Fundo escuro com gradientes sutis em marrom e terracota.
- * - Banner acolhedor "Seu próximo rolê começa aqui".
- * - Card de autenticação com campos de E-mail e Senha.
- * - Controle de exibição/ocultação de senha.
- * - Link "Esqueci minha senha" com diálogo informativo provisório.
- * - Botão principal "Entrar" com indicador de carregamento.
- * - Retorno garantido à Tela Inicial existente após login bem-sucedido,
- *   sem duplicação na pilha de navegação.
+ * Integração Etapa 3:
+ * - Primeiro acesso demonstrativo: direciona para Seleção de Preferências (Screen.Preferences).
+ * - Acessos seguintes (configuração já concluída): retorna diretamente à Tela Inicial.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +54,8 @@ fun LoginScreen(
     initialEmail: String = "",
     authService: DemoAuthService = remember { DemoAuthService.instance }
 ) {
+    val context = LocalContext.current
+    val preferencesRepository = remember { UserPreferencesRepository.getInstance(context) }
     val coroutineScope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
@@ -87,6 +85,21 @@ fun LoginScreen(
         }
     }
 
+    /**
+     * Direciona o fluxo após login bem-sucedido:
+     * - Se as preferências ainda não foram configuradas: abre a tela de Preferências.
+     * - Se já foram configuradas: retorna à Tela Inicial sem duplicar a pilha.
+     */
+    fun navigateAfterLogin() {
+        if (!preferencesRepository.isPreferencesConfigured()) {
+            navController.navigate(Screen.Preferences.route) {
+                popUpTo(Screen.Login.route) { inclusive = true }
+            }
+        } else {
+            navigateBackToHome()
+        }
+    }
+
     // ── Submissão do login ──────────────────────────────────────────────
     fun handleLogin() {
         focusManager.clearFocus()
@@ -108,8 +121,8 @@ fun LoginScreen(
             when (result) {
                 is AuthResult.Success -> {
                     successFeedback = "Login demonstrativo realizado! Bem-vindo de volta ao Culturama."
-                    delay(800)
-                    navigateBackToHome()
+                    delay(700)
+                    navigateAfterLogin()
                 }
                 is AuthResult.Error -> {
                     generalError = result.message
@@ -256,7 +269,7 @@ fun LoginScreen(
                                     val res = authService.loginWithGoogle()
                                     isLoading = false
                                     if (res is AuthResult.Success) {
-                                        navigateBackToHome()
+                                        navigateAfterLogin()
                                     }
                                 }
                             },
@@ -446,7 +459,7 @@ fun LoginScreen(
 
                         // Aviso demonstrativo TCC
                         Text(
-                            text = "🔧 Etapa 2 · Demonstração de interface para TCC ADS",
+                            text = "🔧 Etapa 3 · Demonstração de interface para TCC ADS",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = TextTertiary.copy(alpha = 0.6f),
                                 fontSize = 11.sp
