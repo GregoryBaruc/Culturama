@@ -1,12 +1,20 @@
 package com.example.culturama.navigation
 
 /**
- * Rotas de navegação do aplicativo.
- * Centralizadas aqui para facilitar expansão futura.
+ * Rotas de navegação do aplicativo Culturama.
+ * Centralizadas para manter uma arquitetura escalável e desacoplada.
  */
 sealed class Screen(val route: String) {
     object Home   : Screen("home")
-    object Access : Screen("access")         // Tela provisória: Entrar / Criar conta
-    object Login  : Screen("login")          // Placeholder — próxima etapa
-    object SignUp : Screen("signup")         // Placeholder — próxima etapa
+    object Access : Screen("access")
+    object Login  : Screen("login") {
+        fun createRoute(registeredEmail: String? = null): String {
+            return if (!registeredEmail.isNullOrBlank()) {
+                "login?email=$registeredEmail"
+            } else {
+                "login"
+            }
+        }
+    }
+    object SignUp : Screen("signup")
 }

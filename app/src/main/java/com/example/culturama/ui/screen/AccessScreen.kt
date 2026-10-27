@@ -1,5 +1,6 @@
 package com.example.culturama.ui.screen
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,14 +17,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.culturama.navigation.Screen
 import com.example.culturama.ui.theme.*
 
 /**
- * Tela provisória de acesso ao Culturama.
- * Apresenta as opções "Entrar" e "Criar conta".
- * A implementação definitiva de autenticação será feita na próxima etapa.
- *
- * TODO: Implementar autenticação real (Firebase Auth ou outro provider).
+ * Tela de acesso ao Culturama (acionada pelo botão "Abrir o mapa").
+ * Permite direcionar o usuário para o cadastro ou login de forma intuitiva.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,7 +76,7 @@ fun AccessScreen(navController: NavController) {
             )
 
             Text(
-                text      = "Acesse sua conta para descobrir e favoritar eventos culturais.",
+                text      = "Acesse sua conta para descobrir e favoritar eventos culturais no mapa.",
                 style     = MaterialTheme.typography.bodyLarge.copy(color = TextSecondary),
                 textAlign = TextAlign.Center
             )
@@ -86,7 +85,7 @@ fun AccessScreen(navController: NavController) {
 
             // ── Botão Criar conta ─────────────────────────────────────────
             Button(
-                onClick  = { /* TODO: Navegar para tela de cadastro definitiva */ },
+                onClick  = { navController.navigate(Screen.SignUp.route) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
@@ -108,15 +107,16 @@ fun AccessScreen(navController: NavController) {
 
             // ── Botão Entrar ─────────────────────────────────────────────
             OutlinedButton(
-                onClick  = { /* TODO: Navegar para tela de login definitiva */ },
+                onClick  = { navController.navigate(Screen.Login.route) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
                 colors   = ButtonDefaults.outlinedButtonColors(
                     contentColor = TextPrimary
                 ),
-                border = ButtonDefaults.outlinedButtonBorder.copy(
-                    brush = Brush.horizontalGradient(
+                border = BorderStroke(
+                    1.dp,
+                    Brush.horizontalGradient(
                         listOf(CulturamaOrange.copy(alpha = 0.6f), CulturamaOrange)
                     )
                 ),
@@ -139,7 +139,7 @@ fun AccessScreen(navController: NavController) {
                 color = Color.White.copy(alpha = 0.06f)
             ) {
                 Text(
-                    text      = "🔧  Autenticação será implementada na próxima etapa do desenvolvimento.",
+                    text      = "📍 Crie sua conta ou faça login para explorar os eventos culturais.",
                     style     = MaterialTheme.typography.bodySmall.copy(color = TextTertiary),
                     textAlign = TextAlign.Center,
                     modifier  = Modifier.padding(16.dp)

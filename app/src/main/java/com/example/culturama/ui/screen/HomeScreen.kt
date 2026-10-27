@@ -110,8 +110,8 @@ fun HomeScreen(navController: NavController) {
             onMapClick        = { navController.navigate(Screen.Access.route) },
             onOrganizersClick = { /* TODO: próxima etapa */ },
             onCompaniesClick  = { /* TODO: próxima etapa */ },
-            onLoginClick      = { navController.navigate(Screen.Access.route) },
-            onSignUpClick     = { navController.navigate(Screen.Access.route) },
+            onLoginClick      = { navController.navigate(Screen.Login.route) },
+            onSignUpClick     = { navController.navigate(Screen.SignUp.route) },
             modifier          = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopStart)
