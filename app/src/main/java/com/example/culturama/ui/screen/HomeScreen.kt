@@ -108,7 +108,7 @@ fun HomeScreen(navController: NavController) {
                 }
             },
             onMapClick        = { navController.navigate(Screen.Access.route) },
-            onOrganizersClick = { /* TODO: próxima etapa */ },
+            onOrganizersClick = { navController.navigate(Screen.Organizers.route) },
             onCompaniesClick  = { /* TODO: próxima etapa */ },
             onLoginClick      = { navController.navigate(Screen.Login.route) },
             onSignUpClick     = { navController.navigate(Screen.SignUp.route) },
