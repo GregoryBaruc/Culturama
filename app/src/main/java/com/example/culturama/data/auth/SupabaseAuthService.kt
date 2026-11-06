@@ -11,6 +11,7 @@ import com.example.culturama.BuildConfig
 import com.example.culturama.data.remote.ApiClient
 import com.example.culturama.data.remote.ApiException
 import com.example.culturama.data.remote.CadastroBody
+import com.example.culturama.data.remote.CompletarPerfilBody
 import com.example.culturama.data.remote.SupabaseProvider
 import com.example.culturama.data.remote.chamarApi
 import io.github.jan.supabase.auth.SignOutScope
@@ -120,6 +121,19 @@ class SupabaseAuthService private constructor() {
             return AuthResult.Error("Não foi possível entrar com Google. Tente de novo.")
         }
         return conferirConta()
+    }
+
+    /** `null` quando não deu para saber, como numa falha de rede. */
+    suspend fun isProfileComplete(): Boolean? =
+        chamarApi { ApiClient.api.eu() }.getOrNull()?.usuario?.perfilCompleto
+
+    /** Data de nascimento e aceite de quem criou a conta pelo Google. */
+    suspend fun completeProfile(birthDateIso: String, privacyAccepted: Boolean): AuthResult<Unit> {
+        val resultado = chamarApi {
+            ApiClient.api.completarPerfil(CompletarPerfilBody(birthDateIso, privacyAccepted))
+        }
+        return resultado.exceptionOrNull()?.let { AuthResult.Error(it.message.orEmpty()) }
+            ?: AuthResult.Success(Unit)
     }
 
     /** O Supabase não sabe de suspensão: quem aplica essa regra é o site. */

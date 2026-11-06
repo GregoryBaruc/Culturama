@@ -46,10 +46,10 @@ import com.example.culturama.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private const val PRIVACY_URL = "https://culturama-iota-two.vercel.app/privacidade"
+internal const val PRIVACY_URL = "https://culturama-iota-two.vercel.app/privacidade"
 
 /** Mostra os dígitos digitados como DD/MM/AAAA. */
-private val BirthDateTransformation = VisualTransformation { texto ->
+internal val BirthDateTransformation = VisualTransformation { texto ->
     val digitos = texto.text
     val formatado = buildString {
         digitos.forEachIndexed { indice, digito ->

@@ -2,13 +2,21 @@ package com.example.culturama.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
+import com.example.culturama.data.auth.SupabaseAuthService
 import com.example.culturama.data.remote.ApiClient
 import com.example.culturama.ui.screen.AccessScreen
+import com.example.culturama.ui.screen.CompleteProfileScreen
 import com.example.culturama.ui.screen.HomeScreen
 import com.example.culturama.ui.screen.LoginScreen
 import com.example.culturama.ui.screen.OrganizerAccessScreen
@@ -22,6 +30,25 @@ fun CulturamaNavGraph(navController: NavHostController) {
     LaunchedEffect(Unit) {
         ApiClient.sessaoEncerrada.collect {
             navController.navigate(Screen.Login.route) { launchSingleTop = true }
+        }
+    }
+
+    // Conta sem data de nascimento ou aceite só segue depois de completar o cadastro.
+    // Confere a cada troca de tela até o perfil estar completo: login e abertura do app passam por aqui.
+    val authService = remember { SupabaseAuthService.instance }
+    val isLoggedIn by authService.isLoggedIn.collectAsState(initial = false)
+    val rotaAtual = navController.currentBackStackEntryAsState().value?.destination?.route
+    var perfilConfirmado by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isLoggedIn, rotaAtual) {
+        if (!isLoggedIn) {
+            perfilConfirmado = false
+        } else if (!perfilConfirmado && rotaAtual != null && rotaAtual != Screen.CompleteProfile.route) {
+            when (authService.isProfileComplete()) {
+                true -> perfilConfirmado = true
+                false -> navController.navigate(Screen.CompleteProfile.route) { launchSingleTop = true }
+                null -> Unit
+            }
         }
     }
 
@@ -59,6 +86,9 @@ fun CulturamaNavGraph(navController: NavHostController) {
         }
         composable(Screen.Preferences.route) {
             PreferencesScreen(navController = navController)
+        }
+        composable(Screen.CompleteProfile.route) {
+            CompleteProfileScreen(navController = navController)
         }
     }
 }

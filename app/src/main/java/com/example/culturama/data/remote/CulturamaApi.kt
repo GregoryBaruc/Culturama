@@ -41,6 +41,14 @@ data class EventoDetalheDto(
     val urlNoSite: String?
 )
 
+/** A API devolve o detalhe dentro de "evento". */
+data class RespostaEventoDto(val evento: EventoDetalheDto)
+
+data class UsuarioDto(val id: String?, val perfilCompleto: Boolean?)
+data class RespostaEuDto(val usuario: UsuarioDto?)
+
+data class CompletarPerfilBody(val dataNascimento: String, val aceite: Boolean)
+
 data class CadastroBody(
     val nome: String,
     val email: String,
@@ -61,13 +69,16 @@ interface CulturamaApi {
     ): ListaEventosDto
 
     @GET("eventos/{id}")
-    suspend fun evento(@Path("id") id: String): EventoDetalheDto
+    suspend fun evento(@Path("id") id: String): RespostaEventoDto
 
     @POST("cadastro")
     suspend fun cadastro(@Body body: CadastroBody)
 
     @GET("eu")
-    suspend fun eu()
+    suspend fun eu(): RespostaEuDto
+
+    @POST("eu/completar")
+    suspend fun completarPerfil(@Body body: CompletarPerfilBody)
 
     @GET("favoritos")
     suspend fun favoritos(): JsonElement

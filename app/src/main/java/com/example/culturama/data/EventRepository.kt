@@ -33,7 +33,7 @@ object EventRepository {
     }
 
     suspend fun getEventDetails(id: String): Result<EventModel> = chamarApi {
-        ApiClient.api.evento(id).paraModelo()
+        ApiClient.api.evento(id).evento.paraModelo()
     }
 
     suspend fun getFavoriteIds(): Result<Set<String>> = chamarApi {
