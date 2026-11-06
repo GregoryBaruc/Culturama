@@ -20,7 +20,7 @@ object EventRepository {
 
     private val FUSO = TimeZone.getTimeZone("America/Sao_Paulo")
     private val MESES = listOf("JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ")
-    private val DIAS = listOf("Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb")
+    private val DIAS = listOf("Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "SÃ¡b")
 
     suspend fun getWeekEvents(): Result<List<EventModel>> = chamarApi {
         val dia = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { timeZone = FUSO }
@@ -44,7 +44,7 @@ object EventRepository {
         if (favorite) ApiClient.api.favoritar(FavoritoBody(id)) else ApiClient.api.desfavoritar(id)
     }
 
-    /** O guia não mostra o JSON de GET /favoritos: aceita lista direta ou objeto com a lista. */
+    /** O guia nÃ£o mostra o JSON de GET /favoritos: aceita lista direta ou objeto com a lista. */
     private fun idsDeFavoritos(json: JsonElement): Set<String> {
         val lista = when {
             json.isJsonArray -> json.asJsonArray
@@ -64,20 +64,34 @@ object EventRepository {
         }.toSet()
     }
 
+    suspend fun getAllEvents(limite: Int = 100): Result<List<EventModel>> = chamarApi {
+        ApiClient.api.eventos(limite = limite).eventos.orEmpty().map { it.paraModelo() }
+    }
+
     private fun EventoResumoDto.paraModelo() = modelo(
-        id, titulo, dataHora, endereco, imagemCapa, gratuito, categoria, fonte
+        id, titulo, dataHora, endereco, imagemCapa, gratuito, acessivel, categoria, fonte
     )
 
-    private fun EventoDetalheDto.paraModelo() = modelo(
-        id, titulo, dataHora, endereco, imagemCapa, gratuito, categoria, fonte
-    ).copy(
-        description = descricao.orEmpty(),
-        organizerName = organizador?.nome.orEmpty(),
-        ticketUrl = linkIngresso,
-        moreInfoUrl = linkSaibaMais,
-        siteUrl = urlNoSite,
-        detailsLoaded = true
-    )
+    private fun EventoDetalheDto.paraModelo(): EventModel {
+        val infoAcessibilidade = buildList {
+            if (acessibilidade?.libras == true) add("Intérprete de Libras")
+            if (acessibilidade?.audiodescricao == true) add("Audiodescrição")
+            acessibilidade?.espaco?.filter { it.isNotBlank() }?.let { addAll(it) }
+        }.joinToString(", ")
+
+        return modelo(
+            id, titulo, dataHora, endereco, imagemCapa, gratuito, acessivel, categoria, fonte
+        ).copy(
+            description = descricao.orEmpty(),
+            organizerName = organizador?.nome.orEmpty(),
+            ticketUrl = linkIngresso,
+            moreInfoUrl = linkSaibaMais,
+            siteUrl = urlNoSite,
+            isAccessible = acessivel == true || infoAcessibilidade.isNotBlank(),
+            accessibilityInfo = infoAcessibilidade,
+            detailsLoaded = true
+        )
+    }
 
     private fun modelo(
         id: String,
@@ -86,6 +100,7 @@ object EventRepository {
         endereco: String?,
         imagemCapa: String?,
         gratuito: Boolean?,
+        acessivel: Boolean?,
         categoria: CategoriaDto?,
         fonte: FonteDto?
     ): EventModel {
@@ -102,10 +117,11 @@ object EventRepository {
             time = calendario?.let { horario(it) }.orEmpty(),
             venueName = endereco.orEmpty(),
             isFree = gratuito == true,
-            price = "Pago",
+            price = if (gratuito == true) "Gratuito" else "Pago",
             imageUrl = imagemCapa,
             sourceName = fonte?.nome,
-            sourceUrl = fonte?.link
+            sourceUrl = fonte?.link,
+            isAccessible = acessivel == true
         )
     }
 

@@ -144,14 +144,7 @@ fun HomeScreen(navController: NavController) {
 
         // ── Cabeçalho fixo sobreposto ──────────────────────────────────────
         CulturamaTopBar(
-            onEventsClick     = {
-                coroutineScope.launch {
-                    scrollState.animateScrollTo(
-                        value         = heroHeightPx,
-                        animationSpec = tween(600, easing = FastOutSlowInEasing)
-                    )
-                }
-            },
+            onEventsClick     = { navController.navigate(Screen.Events.route) },
             onMapClick        = { navController.navigate(Screen.Access.route) },
             onOrganizersClick = { navController.navigate(Screen.Organizers.route) },
             onCompaniesClick  = { /* TODO: próxima etapa */ },

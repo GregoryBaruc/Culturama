@@ -1,4 +1,4 @@
-package com.example.culturama.navigation
+﻿package com.example.culturama.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -22,19 +22,21 @@ import com.example.culturama.ui.screen.LoginScreen
 import com.example.culturama.ui.screen.OrganizerAccessScreen
 import com.example.culturama.ui.screen.OrganizersScreen
 import com.example.culturama.ui.screen.PreferencesScreen
+import com.example.culturama.ui.screen.EventsScreen
+import com.example.culturama.ui.screen.EventDetailScreen
 import com.example.culturama.ui.screen.SignUpScreen
 
 @Composable
 fun CulturamaNavGraph(navController: NavHostController) {
-    // Sessão encerrada pelo servidor: leva a pessoa para entrar de novo.
+    // SessÃ£o encerrada pelo servidor: leva a pessoa para entrar de novo.
     LaunchedEffect(Unit) {
         ApiClient.sessaoEncerrada.collect {
             navController.navigate(Screen.Login.route) { launchSingleTop = true }
         }
     }
 
-    // Conta sem data de nascimento ou aceite só segue depois de completar o cadastro.
-    // Confere a cada troca de tela até o perfil estar completo: login e abertura do app passam por aqui.
+    // Conta sem data de nascimento ou aceite sÃ³ segue depois de completar o cadastro.
+    // Confere a cada troca de tela atÃ© o perfil estar completo: login e abertura do app passam por aqui.
     val authService = remember { SupabaseAuthService.instance }
     val isLoggedIn by authService.isLoggedIn.collectAsState(initial = false)
     val rotaAtual = navController.currentBackStackEntryAsState().value?.destination?.route
@@ -58,6 +60,16 @@ fun CulturamaNavGraph(navController: NavHostController) {
     ) {
         composable(Screen.Home.route) {
             HomeScreen(navController = navController)
+        }
+        composable(Screen.Events.route) {
+            EventsScreen(navController = navController)
+        }
+        composable(
+            route = "eventDetail?eventId={eventId}",
+            arguments = listOf(navArgument("eventId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val eventId = backStackEntry.arguments?.getString("eventId") ?: ""
+            EventDetailScreen(navController = navController, eventId = eventId)
         }
         composable(Screen.Access.route) {
             AccessScreen(navController = navController)

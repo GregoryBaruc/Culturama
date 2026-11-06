@@ -1,7 +1,7 @@
 package com.example.culturama.model
 
 /**
- * Evento cultural vindo da API do site. Os campos de detalhe só são
+ * Evento cultural vindo da API do site. Os campos de detalhe sÃ³ sÃ£o
  * preenchidos depois de abrir o evento ([detailsLoaded]).
  */
 data class EventModel(
@@ -23,5 +23,7 @@ data class EventModel(
     val ticketUrl: String? = null,
     val moreInfoUrl: String? = null,
     val siteUrl: String? = null,
+    val isAccessible: Boolean = false,
+    val accessibilityInfo: String = "",
     val detailsLoaded: Boolean = false
 )

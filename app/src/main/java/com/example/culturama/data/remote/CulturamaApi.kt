@@ -12,6 +12,12 @@ data class CategoriaDto(val id: String?, val nome: String?, val slug: String?)
 data class FonteDto(val nome: String?, val link: String?)
 data class OrganizadorDto(val nome: String?, val verificado: Boolean?)
 
+data class AcessibilidadeDto(
+    val libras: Boolean? = false,
+    val audiodescricao: Boolean? = false,
+    val espaco: List<String>? = emptyList()
+)
+
 data class EventoResumoDto(
     val id: String,
     val titulo: String?,
@@ -19,6 +25,7 @@ data class EventoResumoDto(
     val endereco: String?,
     val imagemCapa: String?,
     val gratuito: Boolean?,
+    val acessivel: Boolean? = null,
     val categoria: CategoriaDto?,
     val fonte: FonteDto?
 )
@@ -32,13 +39,15 @@ data class EventoDetalheDto(
     val endereco: String?,
     val imagemCapa: String?,
     val gratuito: Boolean?,
+    val acessivel: Boolean? = null,
     val categoria: CategoriaDto?,
     val fonte: FonteDto?,
     val descricao: String?,
     val linkIngresso: String?,
     val linkSaibaMais: String?,
     val organizador: OrganizadorDto?,
-    val urlNoSite: String?
+    val urlNoSite: String?,
+    val acessibilidade: AcessibilidadeDto? = null
 )
 
 /** A API devolve o detalhe dentro de "evento". */
@@ -59,7 +68,7 @@ data class CadastroBody(
 
 data class FavoritoBody(val eventoId: String)
 
-/** Rotas do site. O login não passa por aqui: é feito pelo SDK do Supabase. */
+/** Rotas do site. O login nÃ£o passa por aqui: Ã© feito pelo SDK do Supabase. */
 interface CulturamaApi {
     @GET("eventos")
     suspend fun eventos(
