@@ -1,25 +1,27 @@
 package com.example.culturama.model
 
 /**
- * Modelo de dados de um evento cultural.
- * Estruturado para facilitar futura integração com API REST.
+ * Evento cultural vindo da API do site. Os campos de detalhe só são
+ * preenchidos depois de abrir o evento ([detailsLoaded]).
  */
 data class EventModel(
     val id: String,
     val title: String,
-    val description: String,
     val category: String,
-    val categoryColor: Long,       // ARGB color para a categoria
     val dayOfMonth: Int,
     val monthAbbr: String,
     val dayOfWeek: String,
     val time: String,
     val venueName: String,
-    val address: String,
     val isFree: Boolean,
-    val price: String = "",        // Ex: "R$ 40,00" ou vazio se gratuito
-    val imageResId: Int? = null,   // Recurso drawable local (temporário)
-    val imageUrl: String? = null,  // URL futura da API
+    val price: String = "",
+    val imageUrl: String? = null,
+    val sourceName: String? = null,
+    val sourceUrl: String? = null,
+    val description: String = "",
     val organizerName: String = "",
-    val isFavorited: Boolean = false
+    val ticketUrl: String? = null,
+    val moreInfoUrl: String? = null,
+    val siteUrl: String? = null,
+    val detailsLoaded: Boolean = false
 )

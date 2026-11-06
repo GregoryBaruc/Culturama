@@ -197,7 +197,8 @@ fun FloatingImages(
 
             FloatingEventImage(
                 imageContent = {
-                    EventImagePlaceholder(
+                    EventCover(
+                        imageUrl = event?.imageUrl,
                         label    = event?.title?.take(14) ?: "Cultural",
                         emoji    = emoji,
                         gradient = gradient

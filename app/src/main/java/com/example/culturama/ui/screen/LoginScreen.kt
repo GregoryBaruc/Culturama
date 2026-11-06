@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.culturama.data.auth.AuthResult
-import com.example.culturama.data.auth.DemoAuthService
+import com.example.culturama.data.auth.SupabaseAuthService
 import com.example.culturama.data.preference.UserPreferencesRepository
 import com.example.culturama.data.validation.FormValidator
 import com.example.culturama.navigation.Screen
@@ -44,7 +44,7 @@ import kotlinx.coroutines.launch
  * Tela de Login de Usuário Comum.
  *
  * Integração Etapa 3:
- * - Primeiro acesso demonstrativo: direciona para Seleção de Preferências (Screen.Preferences).
+ * - Primeiro acesso: direciona para Seleção de Preferências (Screen.Preferences).
  * - Acessos seguintes (configuração já concluída): retorna diretamente à Tela Inicial.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,7 +52,7 @@ import kotlinx.coroutines.launch
 fun LoginScreen(
     navController: NavController,
     initialEmail: String = "",
-    authService: DemoAuthService = remember { DemoAuthService.instance }
+    authService: SupabaseAuthService = remember { SupabaseAuthService.instance }
 ) {
     val context = LocalContext.current
     val preferencesRepository = remember { UserPreferencesRepository.getInstance(context) }
@@ -120,7 +120,7 @@ fun LoginScreen(
             isLoading = false
             when (result) {
                 is AuthResult.Success -> {
-                    successFeedback = "Login demonstrativo realizado! Bem-vindo de volta ao Culturama."
+                    successFeedback = "Bem-vindo de volta ao Culturama!"
                     delay(700)
                     navigateAfterLogin()
                 }
@@ -265,11 +265,14 @@ fun LoginScreen(
                         GoogleSignInButton(
                             onClick = {
                                 coroutineScope.launch {
+                                    generalError = null
                                     isLoading = true
-                                    val res = authService.loginWithGoogle()
+                                    val res = authService.loginWithGoogle(context)
                                     isLoading = false
-                                    if (res is AuthResult.Success) {
-                                        navigateAfterLogin()
+                                    when (res) {
+                                        is AuthResult.Success -> navigateAfterLogin()
+                                        is AuthResult.Error -> generalError = res.message
+                                        else -> Unit
                                     }
                                 }
                             },
@@ -455,18 +458,6 @@ fun LoginScreen(
                             )
                         }
 
-                        Spacer(Modifier.height(12.dp))
-
-                        // Aviso demonstrativo TCC
-                        Text(
-                            text = "🔧 Etapa 3 · Demonstração de interface para TCC ADS",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = TextTertiary.copy(alpha = 0.6f),
-                                fontSize = 11.sp
-                            ),
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
                     }
                 }
             }

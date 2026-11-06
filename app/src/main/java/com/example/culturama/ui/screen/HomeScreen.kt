@@ -1,6 +1,7 @@
 package com.example.culturama.ui.screen
 
 import androidx.compose.animation.core.*
+import android.widget.Toast
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,10 +12,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.culturama.data.DemoEventRepository
+import com.example.culturama.data.EventRepository
+import com.example.culturama.data.auth.SupabaseAuthService
 import com.example.culturama.model.EventModel
 import com.example.culturama.navigation.Screen
 import com.example.culturama.ui.component.*
@@ -32,13 +35,41 @@ fun HomeScreen(navController: NavController) {
     val scrollState    = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
     val density        = LocalDensity.current
+    val context        = LocalContext.current
+    val authService    = remember { SupabaseAuthService.instance }
+    val isLoggedIn by authService.isLoggedIn.collectAsState(initial = false)
 
     // Estado: eventos e favoritos
-    val events       = remember { DemoEventRepository.getWeekEvents() }
+    var events       by remember { mutableStateOf(emptyList<EventModel>()) }
+    var isLoading    by remember { mutableStateOf(true) }
+    var eventsError  by remember { mutableStateOf<String?>(null) }
+    var reloadKey    by remember { mutableIntStateOf(0) }
     var favoritedIds by remember { mutableStateOf(setOf<String>()) }
+
+    LaunchedEffect(reloadKey) {
+        isLoading = true
+        eventsError = null
+        EventRepository.getWeekEvents()
+            .onSuccess { events = it }
+            .onFailure { eventsError = it.message }
+        isLoading = false
+    }
+
+    LaunchedEffect(isLoggedIn) {
+        favoritedIds = if (isLoggedIn) EventRepository.getFavoriteIds().getOrDefault(emptySet()) else emptySet()
+    }
 
     // Estado: evento selecionado para o bottom sheet
     var selectedEvent by remember { mutableStateOf<EventModel?>(null) }
+
+    LaunchedEffect(selectedEvent?.id) {
+        val event = selectedEvent ?: return@LaunchedEffect
+        if (!event.detailsLoaded) {
+            // Sem o detalhe, o sheet segue com os dados do card e para de carregar.
+            selectedEvent = EventRepository.getEventDetails(event.id)
+                .getOrDefault(event.copy(detailsLoaded = true))
+        }
+    }
 
     // Altura da seção Hero em pixels (capturada via onGloballyPositioned)
     var heroHeightPx by remember { mutableIntStateOf(0) }
@@ -88,11 +119,25 @@ fun HomeScreen(navController: NavController) {
                     events        = events,
                     favoritedIds  = favoritedIds,
                     onFavorite    = { id ->
-                        favoritedIds = if (id in favoritedIds)
-                            favoritedIds - id else favoritedIds + id
+                        if (!isLoggedIn) {
+                            navController.navigate(Screen.Login.route)
+                        } else {
+                            val before   = favoritedIds
+                            val favorite = id !in before
+                            favoritedIds = if (favorite) before + id else before - id
+                            coroutineScope.launch {
+                                EventRepository.setFavorite(id, favorite).onFailure { erro ->
+                                    favoritedIds = before
+                                    Toast.makeText(context, erro.message, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
                     },
                     onEventClick  = { event -> selectedEvent = event },
-                    onSeeAll      = { /* TODO: Navegar para lista completa na próxima etapa */ }
+                    onSeeAll      = { /* TODO: Navegar para lista completa na próxima etapa */ },
+                    isLoading     = isLoading,
+                    errorMessage  = eventsError,
+                    onRetry       = { reloadKey++ }
                 )
             }
         }
@@ -113,6 +158,8 @@ fun HomeScreen(navController: NavController) {
             onLoginClick      = { navController.navigate(Screen.Login.route) },
             onSignUpClick     = { navController.navigate(Screen.SignUp.route) },
             onPreferencesClick= { navController.navigate(Screen.Preferences.route) },
+            isLoggedIn        = isLoggedIn,
+            onLogoutClick     = { coroutineScope.launch { authService.logout() } },
             modifier          = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopStart)
@@ -134,7 +181,8 @@ fun HomeScreen(navController: NavController) {
             event        = event,
             onDismiss    = { selectedEvent = null },
             imageContent = {
-                EventImagePlaceholder(
+                EventCover(
+                    imageUrl = event.imageUrl,
                     label    = event.title,
                     emoji    = eventEmoji(event.category),
                     gradient = eventGradient(event.category)

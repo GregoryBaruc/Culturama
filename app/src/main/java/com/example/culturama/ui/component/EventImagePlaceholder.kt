@@ -11,10 +11,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 
 /**
  * Imagem placeholder visualmente rica.
@@ -49,6 +51,31 @@ fun EventImagePlaceholder(
                 ),
                 textAlign = TextAlign.Center,
                 modifier  = Modifier.padding(horizontal = 8.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Capa do evento. O placeholder fica por baixo enquanto a imagem carrega
+ * e quando o evento não tem capa ou ela falha.
+ */
+@Composable
+fun EventCover(
+    imageUrl: String?,
+    label:    String,
+    emoji:    String,
+    gradient: List<Color>,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier.fillMaxSize()) {
+        EventImagePlaceholder(label = label, emoji = emoji, gradient = gradient)
+        if (!imageUrl.isNullOrBlank()) {
+            AsyncImage(
+                model              = imageUrl,
+                contentDescription = null,
+                contentScale       = ContentScale.Crop,
+                modifier           = Modifier.fillMaxSize()
             )
         }
     }

@@ -1,5 +1,7 @@
 package com.example.culturama.ui.component
 
+import android.content.Intent
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -15,7 +17,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.culturama.model.EventModel
@@ -32,6 +36,11 @@ fun EventDetailBottomSheet(
     onDismiss:       () -> Unit,
     imageContent:    @Composable BoxScope.() -> Unit
 ) {
+    val context    = LocalContext.current
+    val uriHandler = LocalUriHandler.current
+    val abrirLink: (String) -> Unit = { url -> runCatching { uriHandler.openUri(url) } }
+    val linkPrincipal = event.ticketUrl ?: event.moreInfoUrl ?: event.siteUrl
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState       = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -94,10 +103,17 @@ fun EventDetailBottomSheet(
                 )
 
                 // Descrição
-                Text(
-                    text  = event.description,
-                    style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary)
-                )
+                if (event.description.isNotBlank()) {
+                    Text(
+                        text  = event.description,
+                        style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary)
+                    )
+                } else if (!event.detailsLoaded) {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth(),
+                        color    = CulturamaOrange
+                    )
+                }
 
                 HorizontalDivider(color = TextTertiary.copy(alpha = 0.2f))
 
@@ -112,7 +128,7 @@ fun EventDetailBottomSheet(
                 InfoRow(
                     icon  = Icons.Default.LocationOn,
                     label = "Local",
-                    value = "${event.venueName}\n${event.address}"
+                    value = event.venueName
                 )
 
                 // Preço
@@ -149,24 +165,59 @@ fun EventDetailBottomSheet(
                     )
                 }
 
+                // Crédito da fonte: combinado com a Prefeitura de Santo André no CulturAZ
+                if (!event.sourceName.isNullOrBlank()) {
+                    val link = event.sourceUrl
+                    Text(
+                        text  = "Fonte: ${event.sourceName}",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color          = if (link != null) CulturamaOrange else TextTertiary,
+                            textDecoration = if (link != null) TextDecoration.Underline else null
+                        ),
+                        modifier = if (link != null) {
+                            Modifier.clickable(onClickLabel = "Abrir evento original") { abrirLink(link) }
+                        } else {
+                            Modifier
+                        }
+                    )
+                }
+
                 Spacer(Modifier.height(8.dp))
 
-                // Botão CTA — placeholder para futura funcionalidade
-                Button(
-                    onClick = { /* TODO: Abrir ingresso / informações externas */ },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = CulturamaOrange,
-                        contentColor   = Color.White
-                    ),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Text(
-                        text  = if (event.isFree) "Quero participar" else "Ver ingressos",
-                        style = MaterialTheme.typography.labelLarge
-                    )
+                if (linkPrincipal != null) {
+                    Button(
+                        onClick = { abrirLink(linkPrincipal) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = CulturamaOrange,
+                            contentColor   = Color.White
+                        ),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text(
+                            text  = if (event.ticketUrl != null) "Ver ingressos" else "Saiba mais",
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                }
+
+                event.siteUrl?.let { url ->
+                    TextButton(
+                        onClick = {
+                            val envio = Intent(Intent.ACTION_SEND)
+                                .setType("text/plain")
+                                .putExtra(Intent.EXTRA_TEXT, url)
+                            context.startActivity(Intent.createChooser(envio, "Compartilhar evento"))
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text  = "Compartilhar",
+                            style = MaterialTheme.typography.labelLarge.copy(color = CulturamaOrange)
+                        )
+                    }
                 }
             }
         }

@@ -1,5 +1,10 @@
 package com.example.culturama.data.validation
 
+import java.text.ParseException
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+
 /**
  * Resultado da validação de um campo específico.
  */
@@ -74,6 +79,42 @@ object FormValidator {
                 errorMessage = "A senha deve ter no mínimo 8 caracteres."
             )
             else -> FieldValidationResult(isValid = true)
+        }
+    }
+
+    /**
+     * Valida a data de nascimento digitada só com números (DDMMAAAA).
+     * O site confere de novo a idade mínima de 18 anos.
+     */
+    fun validateBirthDate(digits: String): FieldValidationResult {
+        val nascimento = parseBirthDate(digits) ?: return FieldValidationResult(
+            isValid = false,
+            errorMessage = "Digite uma data válida no formato DD/MM/AAAA."
+        )
+        val limite = Calendar.getInstance().apply { add(Calendar.YEAR, -18) }
+        return if (nascimento.after(limite)) {
+            FieldValidationResult(
+                isValid = false,
+                errorMessage = "O cadastro é só para maiores de 18 anos."
+            )
+        } else {
+            FieldValidationResult(isValid = true)
+        }
+    }
+
+    /** Converte DDMMAAAA para o formato AAAA-MM-DD que a API espera. */
+    fun birthDateToIso(digits: String): String? = parseBirthDate(digits)?.let {
+        SimpleDateFormat("yyyy-MM-dd", Locale.US).format(it.time)
+    }
+
+    private fun parseBirthDate(digits: String): Calendar? {
+        if (digits.length != 8) return null
+        return try {
+            val data = SimpleDateFormat("ddMMyyyy", Locale.US).apply { isLenient = false }.parse(digits)
+            data?.let { Calendar.getInstance().apply { time = it } }
+                ?.takeIf { it.get(Calendar.YEAR) >= 1900 && it.before(Calendar.getInstance()) }
+        } catch (e: ParseException) {
+            null
         }
     }
 

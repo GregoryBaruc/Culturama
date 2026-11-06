@@ -1,11 +1,13 @@
 package com.example.culturama.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.example.culturama.data.remote.ApiClient
 import com.example.culturama.ui.screen.AccessScreen
 import com.example.culturama.ui.screen.HomeScreen
 import com.example.culturama.ui.screen.LoginScreen
@@ -16,6 +18,13 @@ import com.example.culturama.ui.screen.SignUpScreen
 
 @Composable
 fun CulturamaNavGraph(navController: NavHostController) {
+    // Sessão encerrada pelo servidor: leva a pessoa para entrar de novo.
+    LaunchedEffect(Unit) {
+        ApiClient.sessaoEncerrada.collect {
+            navController.navigate(Screen.Login.route) { launchSingleTop = true }
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = Screen.Home.route

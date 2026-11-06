@@ -55,7 +55,8 @@ fun CulturamaTextField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     singleLine: Boolean = true,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    inputTransformation: VisualTransformation = VisualTransformation.None
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
@@ -141,7 +142,7 @@ fun CulturamaTextField(
                     val visualTransformation = if (isPassword && !isPasswordVisible) {
                         PasswordVisualTransformation()
                     } else {
-                        VisualTransformation.None
+                        inputTransformation
                     }
 
                     BasicTextField(

@@ -27,6 +27,9 @@ fun WeekEventsSection(
     onFavorite:   (String) -> Unit,
     onEventClick: (EventModel) -> Unit,
     onSeeAll:     () -> Unit,
+    isLoading:    Boolean = false,
+    errorMessage: String? = null,
+    onRetry:      () -> Unit = {},
     modifier:     Modifier = Modifier
 ) {
     Column(
@@ -45,7 +48,7 @@ fun WeekEventsSection(
             Text(
                 text  = "Acontecendo esta semana",
                 style = MaterialTheme.typography.headlineMedium.copy(
-                    color      = TextPrimary,
+                    color      = Color(0xFF333333),
                     fontWeight = FontWeight.Bold
                 )
             )
@@ -57,6 +60,36 @@ fun WeekEventsSection(
                     )
                 )
             }
+        }
+
+        // ── Carregando, erro ou lista vazia ───────────────────────────────
+        when {
+            isLoading -> Box(
+                modifier         = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = CulturamaOrange)
+            }
+            errorMessage != null -> Column(
+                modifier            = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text  = errorMessage,
+                    style = MaterialTheme.typography.bodyMedium.copy(color = Color(0xFF333333))
+                )
+                TextButton(onClick = onRetry) {
+                    Text(
+                        text  = "Tentar de novo",
+                        style = MaterialTheme.typography.labelLarge.copy(color = CulturamaOrange)
+                    )
+                }
+            }
+            events.isEmpty() -> Text(
+                text     = "Nenhum evento nos próximos 7 dias.",
+                style    = MaterialTheme.typography.bodyMedium.copy(color = Color(0xFF333333)),
+                modifier = Modifier.padding(vertical = 24.dp)
+            )
         }
 
         // ── Grade de eventos ──────────────────────────────────────────────
@@ -126,7 +159,8 @@ private fun AnimatedEventCard(
             onFavorite  = onFavorite,
             onClick     = onClick,
             imageContent = {
-                EventImagePlaceholder(
+                EventCover(
+                    imageUrl = event.imageUrl,
                     label    = event.title,
                     emoji    = eventEmoji(event.category),
                     gradient = eventGradient(event.category)

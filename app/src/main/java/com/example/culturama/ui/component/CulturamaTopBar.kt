@@ -37,7 +37,9 @@ fun CulturamaTopBar(
     onLoginClick: () -> Unit,
     onSignUpClick: () -> Unit,
     modifier: Modifier = Modifier,
-    onPreferencesClick: () -> Unit = {}
+    onPreferencesClick: () -> Unit = {},
+    isLoggedIn: Boolean = false,
+    onLogoutClick: () -> Unit = {}
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
 
@@ -68,21 +70,23 @@ fun CulturamaTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Botão Criar conta — sempre visível
-                Button(
-                    onClick = onSignUpClick,
-                    colors  = ButtonDefaults.buttonColors(
-                        containerColor = CulturamaOrange,
-                        contentColor   = Color.White
-                    ),
-                    shape   = RoundedCornerShape(20.dp),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                    modifier = Modifier.height(36.dp)
-                ) {
-                    Text(
-                        text  = "Criar conta",
-                        style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp)
-                    )
+                // Botão Criar conta — só para quem ainda não entrou
+                if (!isLoggedIn) {
+                    Button(
+                        onClick = onSignUpClick,
+                        colors  = ButtonDefaults.buttonColors(
+                            containerColor = CulturamaOrange,
+                            contentColor   = Color.White
+                        ),
+                        shape   = RoundedCornerShape(20.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Text(
+                            text  = "Criar conta",
+                            style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp)
+                        )
+                    }
                 }
 
                 // Menu hambúrguer
@@ -129,13 +133,16 @@ fun CulturamaTopBar(
                     thickness = 0.5.dp
                 )
 
-                // Entrar — estilo texto
+                // Entrar ou Sair — estilo texto
                 TextButton(
-                    onClick  = { onLoginClick(); menuExpanded = false },
+                    onClick  = {
+                        if (isLoggedIn) onLogoutClick() else onLoginClick()
+                        menuExpanded = false
+                    },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text  = "Entrar",
+                        text  = if (isLoggedIn) "Sair" else "Entrar",
                         style = MaterialTheme.typography.bodyLarge.copy(color = TextSecondary)
                     )
                 }
