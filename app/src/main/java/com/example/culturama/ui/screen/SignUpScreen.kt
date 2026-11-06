@@ -160,9 +160,9 @@ fun SignUpScreen(
                             popUpTo(Screen.SignUp.route) { inclusive = true }
                         }
                     } else {
-                        // Conta criada, mas o login automático não passou: segue pela tela de login
-                        successMessage = "Conta criada! Agora é só entrar com seu e-mail e senha."
-                        delay(1200)
+                        // Conta criada, mas ainda sem confirmar o e-mail: segue pela tela de login
+                        successMessage = "Conta criada! Abra o link que enviamos para o seu e-mail e depois entre aqui."
+                        delay(3000)
                         val targetRoute = Screen.Login.createRoute(registeredEmail = email.trim())
                         navController.navigate(targetRoute) {
                             popUpTo(Screen.SignUp.route) { inclusive = true }
