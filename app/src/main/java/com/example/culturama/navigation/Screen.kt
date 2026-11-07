@@ -28,6 +28,22 @@ sealed class Screen(val route: String) {
     object UserSection     : Screen("user_section/{section}") {
         fun createRoute(section: String): String = "user_section/$section"
     }
+    object AdminPainel     : Screen("admin/{secao}") {
+        fun createRoute(secao: SecaoDoPainel): String = "admin/${secao.id}"
+    }
+    object Moderacao       : Screen("moderacao")
+}
+
+/** Seções do painel. Só a visão geral está implementada. */
+enum class SecaoDoPainel(val id: String, val titulo: String) {
+    VISAO("visao", "Visão geral"),
+    EVENTOS("eventos", "Eventos"),
+    ANUNCIOS("anuncios", "Anúncios"),
+    EMPRESAS("empresas", "Empresas");
+
+    companion object {
+        fun porId(id: String): SecaoDoPainel? = entries.firstOrNull { it.id == id }
+    }
 }
 
 /** Seções do menu do usuário que ainda não têm tela própria. */

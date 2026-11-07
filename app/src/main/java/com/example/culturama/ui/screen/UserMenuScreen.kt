@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Settings
@@ -57,6 +58,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.example.culturama.data.admin.AcessoAdministrativo
+import com.example.culturama.data.admin.PapelNoPainel
 import com.example.culturama.data.auth.ContaAutenticada
 import com.example.culturama.data.auth.SupabaseAuthService
 import com.example.culturama.data.favorite.RemoteFavoriteRepository
@@ -65,6 +68,7 @@ import com.example.culturama.data.preference.UserPreferencesRepository
 import com.example.culturama.data.profile.Interesses
 import com.example.culturama.data.profile.PerfilRepository
 import com.example.culturama.navigation.Screen
+import com.example.culturama.navigation.SecaoDoPainel
 import com.example.culturama.navigation.SecaoDoUsuario
 import com.example.culturama.ui.component.CulturamaIcons
 import com.example.culturama.ui.theme.CulturamaBackground
@@ -93,6 +97,8 @@ fun UserMenuScreen(
     var carregandoConta by remember { mutableStateOf(true) }
     var resumoFavoritos by remember { mutableStateOf<String?>(null) }
     var resumoInteresses by remember { mutableStateOf<String?>(null) }
+    val logado by authService.isLoggedIn.collectAsState(initial = authService.contaAtual() != null)
+    var papel by remember { mutableStateOf(PapelNoPainel.NENHUM) }
 
     LaunchedEffect(Unit) {
         val lida = authService.contaAtual()
@@ -119,6 +125,15 @@ fun UserMenuScreen(
 
     LaunchedEffect(Unit) {
         idDoUsuarioAutenticado()?.let { favoritos.atualizar(it) }
+    }
+
+    LaunchedEffect(logado) {
+        if (authService.contaAtual() == null) {
+            papel = PapelNoPainel.NENHUM
+            return@LaunchedEffect
+        }
+        if (!logado) return@LaunchedEffect
+        papel = AcessoAdministrativo.verificar().getOrDefault(PapelNoPainel.NENHUM)
     }
 
     LaunchedEffect(versaoFavoritos) {
@@ -230,6 +245,40 @@ fun UserMenuScreen(
                 resumo = SecaoDoUsuario.ORGANIZACOES.resumo,
                 onClick = { navController.navigate(Screen.UserSection.createRoute(SecaoDoUsuario.ORGANIZACOES.id)) }
             )
+            if (papel == PapelNoPainel.ADMINISTRADOR) {
+                Text(
+                    text = "Administração",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        color = TextSecondary,
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    modifier = Modifier.padding(top = 4.dp, start = 4.dp)
+                )
+                AtalhoDoPerfil(
+                    icone = Icons.Filled.Lock,
+                    titulo = "Painel administrativo",
+                    resumo = "Visão geral do que está no ar",
+                    onClick = {
+                        navController.navigate(Screen.AdminPainel.createRoute(SecaoDoPainel.VISAO))
+                    }
+                )
+            }
+            if (papel == PapelNoPainel.MODERADOR) {
+                Text(
+                    text = "Moderação",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        color = TextSecondary,
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    modifier = Modifier.padding(top = 4.dp, start = 4.dp)
+                )
+                AtalhoDoPerfil(
+                    icone = Icons.Filled.Lock,
+                    titulo = "Painel de moderação",
+                    resumo = "Revisão, eventos, comentários e denúncias",
+                    onClick = { navController.navigate(Screen.Moderacao.route) }
+                )
+            }
             AtalhoDoPerfil(
                 icone = Icons.Filled.Settings,
                 titulo = "Configurações",

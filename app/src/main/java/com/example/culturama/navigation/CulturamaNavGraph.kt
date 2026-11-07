@@ -18,6 +18,7 @@ import androidx.navigation.navArgument
 import com.example.culturama.data.auth.SupabaseAuthService
 import com.example.culturama.data.favorite.RemoteFavoriteRepository
 import com.example.culturama.data.remote.ApiClient
+import com.example.culturama.ui.screen.AdminPainelScreen
 import com.example.culturama.ui.screen.AccessScreen
 import com.example.culturama.ui.screen.CompleteProfileScreen
 import com.example.culturama.ui.screen.HomeScreen
@@ -25,6 +26,7 @@ import com.example.culturama.ui.screen.EditProfileScreen
 import com.example.culturama.ui.screen.FavoritesScreen
 import com.example.culturama.ui.screen.LoginScreen
 import com.example.culturama.ui.screen.MeusInteressesScreen
+import com.example.culturama.ui.screen.ModeracaoScreen
 import com.example.culturama.ui.screen.OrganizerAccessScreen
 import com.example.culturama.ui.screen.OrganizersScreen
 import com.example.culturama.ui.screen.PreferencesScreen
@@ -136,6 +138,18 @@ fun CulturamaNavGraph(navController: NavHostController) {
                 SecaoDoUsuario.INTERESSES.id -> MeusInteressesScreen(navController = navController)
                 else -> UserSectionScreen(navController = navController, sectionId = section)
             }
+        }
+        composable(
+            route = Screen.AdminPainel.route,
+            arguments = listOf(navArgument("secao") { type = NavType.StringType })
+        ) { backStackEntry ->
+            AdminPainelScreen(
+                navController = navController,
+                secaoId = backStackEntry.arguments?.getString("secao").orEmpty()
+            )
+        }
+        composable(Screen.Moderacao.route) {
+            ModeracaoScreen(navController = navController)
         }
     }
 }

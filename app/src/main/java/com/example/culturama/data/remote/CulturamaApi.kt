@@ -68,7 +68,12 @@ data class UsuarioDto(
     val id: String? = null,
     val perfilCompleto: Boolean? = null,
     val nome: String? = null,
-    val interesses: List<String>? = null
+    val interesses: List<String>? = null,
+    /** Definidos pelo servidor. Ausentes ou falsos não autorizam o painel. */
+    val admin: Boolean? = null,
+    val moderador: Boolean? = null,
+    /** Papel gravado em `users.tipo` quando a API o envia no lugar dos booleanos. */
+    val tipo: String? = null
 )
 data class RespostaEuDto(val usuario: UsuarioDto?)
 
