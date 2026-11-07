@@ -9,6 +9,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,7 +24,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.culturama.data.EventRepository
+import com.example.culturama.data.auth.SupabaseAuthService
+import com.example.culturama.data.favorite.LocalFavoriteRepository
+import com.example.culturama.data.favorite.idDoUsuarioAutenticado
 import com.example.culturama.model.EventModel
+import com.example.culturama.navigation.Screen
 import com.example.culturama.ui.component.EventCover
 import com.example.culturama.ui.theme.*
 
@@ -37,6 +43,14 @@ fun EventDetailScreen(
     eventId: String
 ) {
     val context = LocalContext.current
+    val authService = remember { SupabaseAuthService.instance }
+    val favoritos = remember { LocalFavoriteRepository.from(context) }
+    val isLoggedIn by authService.isLoggedIn.collectAsState(initial = false)
+    val versaoFavoritos by favoritos.alteracoes.collectAsState()
+    val favorited = remember(isLoggedIn, versaoFavoritos, eventId) {
+        val userId = if (isLoggedIn) idDoUsuarioAutenticado() else null
+        userId != null && eventId in favoritos.ids(userId)
+    }
     var event by remember { mutableStateOf<EventModel?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -146,6 +160,20 @@ fun EventDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = {
+                        val userId = idDoUsuarioAutenticado()
+                        if (!isLoggedIn || userId == null) {
+                            navController.navigate(Screen.Login.route)
+                        } else {
+                            favoritos.setFavorite(userId, eventId, !favorited)
+                        }
+                    }) {
+                        Icon(
+                            imageVector = if (favorited) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                            contentDescription = if (favorited) "Remover dos favoritos" else "Adicionar aos favoritos",
+                            tint = if (favorited) FavoriteActive else TextPrimary
+                        )
+                    }
                     IconButton(onClick = { shareEvent() }) {
                         Icon(
                             imageVector = Icons.Default.Share,

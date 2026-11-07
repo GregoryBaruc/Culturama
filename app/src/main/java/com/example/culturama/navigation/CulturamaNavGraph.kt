@@ -18,13 +18,19 @@ import com.example.culturama.data.remote.ApiClient
 import com.example.culturama.ui.screen.AccessScreen
 import com.example.culturama.ui.screen.CompleteProfileScreen
 import com.example.culturama.ui.screen.HomeScreen
+import com.example.culturama.ui.screen.EditProfileScreen
+import com.example.culturama.ui.screen.FavoritesScreen
 import com.example.culturama.ui.screen.LoginScreen
+import com.example.culturama.ui.screen.MeusInteressesScreen
 import com.example.culturama.ui.screen.OrganizerAccessScreen
 import com.example.culturama.ui.screen.OrganizersScreen
 import com.example.culturama.ui.screen.PreferencesScreen
 import com.example.culturama.ui.screen.EventsScreen
 import com.example.culturama.ui.screen.EventDetailScreen
+import com.example.culturama.ui.screen.SettingsScreen
 import com.example.culturama.ui.screen.SignUpScreen
+import com.example.culturama.ui.screen.UserMenuScreen
+import com.example.culturama.ui.screen.UserSectionScreen
 
 @Composable
 fun CulturamaNavGraph(navController: NavHostController) {
@@ -101,6 +107,24 @@ fun CulturamaNavGraph(navController: NavHostController) {
         }
         composable(Screen.CompleteProfile.route) {
             CompleteProfileScreen(navController = navController)
+        }
+        composable(Screen.Profile.route) {
+            UserMenuScreen(navController = navController)
+        }
+        composable(Screen.Settings.route) {
+            SettingsScreen(navController = navController)
+        }
+        composable(
+            route = Screen.UserSection.route,
+            arguments = listOf(navArgument("section") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val section = backStackEntry.arguments?.getString("section").orEmpty()
+            when (section) {
+                SecaoDoUsuario.FAVORITOS.id -> FavoritesScreen(navController = navController)
+                SecaoDoUsuario.EDITAR_PERFIL.id -> EditProfileScreen(navController = navController)
+                SecaoDoUsuario.INTERESSES.id -> MeusInteressesScreen(navController = navController)
+                else -> UserSectionScreen(navController = navController, sectionId = section)
+            }
         }
     }
 }

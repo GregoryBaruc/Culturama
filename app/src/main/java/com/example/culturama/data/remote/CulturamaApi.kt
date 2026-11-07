@@ -9,6 +9,16 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 data class CategoriaDto(val id: String?, val nome: String?, val slug: String?)
+
+/** Categoria do catálogo público, com as subcategorias em `filhas`. */
+data class CategoriaArvoreDto(
+    val id: String?,
+    val nome: String?,
+    val slug: String?,
+    val filhas: List<CategoriaArvoreDto>? = emptyList()
+)
+
+data class ListaCategoriasDto(val categorias: List<CategoriaArvoreDto>?)
 data class FonteDto(val nome: String?, val link: String?)
 data class OrganizadorDto(val nome: String?, val verificado: Boolean?)
 
@@ -82,6 +92,9 @@ interface CulturamaApi {
 
     @POST("cadastro")
     suspend fun cadastro(@Body body: CadastroBody)
+
+    @GET("categorias")
+    suspend fun categorias(): ListaCategoriasDto
 
     @GET("eu")
     suspend fun eu(): RespostaEuDto

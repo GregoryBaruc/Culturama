@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -38,9 +39,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.culturama.data.EventRepository
+import com.example.culturama.data.auth.SupabaseAuthService
+import com.example.culturama.data.favorite.LocalFavoriteRepository
+import com.example.culturama.data.favorite.idDoUsuarioAutenticado
 import java.util.Calendar
 import java.util.TimeZone
 import com.example.culturama.model.EventModel
+import com.example.culturama.navigation.Screen
 import com.example.culturama.ui.component.*
 import com.example.culturama.ui.theme.*
 
@@ -221,6 +226,11 @@ private val regionsList = listOf("Centro", "Zona Sul", "Zona Norte", "Zona Leste
 
 @Composable
 fun EventsScreen(navController: NavController) {
+    val context = LocalContext.current
+    val authService = remember { SupabaseAuthService.instance }
+    val favoritos = remember { LocalFavoriteRepository.from(context) }
+    val isLoggedIn by authService.isLoggedIn.collectAsState(initial = false)
+    val versaoFavoritos by favoritos.alteracoes.collectAsState()
 
     var events               by remember { mutableStateOf(emptyList<EventModel>()) }
     var isLoading            by remember { mutableStateOf(true) }
@@ -247,6 +257,11 @@ fun EventsScreen(navController: NavController) {
     var isListView           by remember { mutableStateOf(true) }
     var favoritedIds         by remember { mutableStateOf(setOf<String>()) }
     var showMoreFiltersSheet by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isLoggedIn, versaoFavoritos) {
+        val userId = if (isLoggedIn) idDoUsuarioAutenticado() else null
+        favoritedIds = userId?.let { favoritos.ids(it).toSet() } ?: emptySet()
+    }
 
     // Estado dos filtros avanÃ§ados persistidos
     var advancedFilters by remember { mutableStateOf(AdvancedFiltersState()) }
@@ -458,10 +473,13 @@ fun EventsScreen(navController: NavController) {
                         event       = event,
                         isFavorited = event.id in favoritedIds,
                         onFavorite  = {
-                            favoritedIds = if (event.id in favoritedIds) {
-                                favoritedIds - event.id
+                            val userId = idDoUsuarioAutenticado()
+                            if (!isLoggedIn || userId == null) {
+                                navController.navigate(Screen.Login.route)
                             } else {
-                                favoritedIds + event.id
+                                favoritedIds = favoritos
+                                    .setFavorite(userId, event.id, event.id !in favoritedIds)
+                                    .toSet()
                             }
                         },
                         onClick      = { navController.navigate("eventDetail?eventId=${event.id}") },

@@ -1,7 +1,6 @@
 package com.example.culturama.ui.screen
 
 import androidx.compose.animation.core.*
-import android.widget.Toast
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.culturama.data.EventRepository
 import com.example.culturama.data.auth.SupabaseAuthService
+import com.example.culturama.data.favorite.LocalFavoriteRepository
+import com.example.culturama.data.favorite.idDoUsuarioAutenticado
 import com.example.culturama.model.EventModel
 import com.example.culturama.navigation.Screen
 import com.example.culturama.ui.component.*
@@ -37,9 +38,11 @@ fun HomeScreen(navController: NavController) {
     val density        = LocalDensity.current
     val context        = LocalContext.current
     val authService    = remember { SupabaseAuthService.instance }
+    val favoritos      = remember { LocalFavoriteRepository.from(context) }
     val isLoggedIn by authService.isLoggedIn.collectAsState(initial = false)
+    val versaoFavoritos by favoritos.alteracoes.collectAsState()
 
-    // Estado: eventos e favoritos
+    // Estado: eventos e favoritos locais desta instalação
     var events       by remember { mutableStateOf(emptyList<EventModel>()) }
     var isLoading    by remember { mutableStateOf(true) }
     var eventsError  by remember { mutableStateOf<String?>(null) }
@@ -55,8 +58,9 @@ fun HomeScreen(navController: NavController) {
         isLoading = false
     }
 
-    LaunchedEffect(isLoggedIn) {
-        favoritedIds = if (isLoggedIn) EventRepository.getFavoriteIds().getOrDefault(emptySet()) else emptySet()
+    LaunchedEffect(isLoggedIn, versaoFavoritos) {
+        val userId = if (isLoggedIn) idDoUsuarioAutenticado() else null
+        favoritedIds = userId?.let { favoritos.ids(it).toSet() } ?: emptySet()
     }
 
     // Estado: evento selecionado para o bottom sheet
@@ -119,18 +123,11 @@ fun HomeScreen(navController: NavController) {
                     events        = events,
                     favoritedIds  = favoritedIds,
                     onFavorite    = { id ->
-                        if (!isLoggedIn) {
+                        val userId = idDoUsuarioAutenticado()
+                        if (!isLoggedIn || userId == null) {
                             navController.navigate(Screen.Login.route)
                         } else {
-                            val before   = favoritedIds
-                            val favorite = id !in before
-                            favoritedIds = if (favorite) before + id else before - id
-                            coroutineScope.launch {
-                                EventRepository.setFavorite(id, favorite).onFailure { erro ->
-                                    favoritedIds = before
-                                    Toast.makeText(context, erro.message, Toast.LENGTH_SHORT).show()
-                                }
-                            }
+                            favoritedIds = favoritos.setFavorite(userId, id, id !in favoritedIds).toSet()
                         }
                     },
                     onEventClick  = { event -> selectedEvent = event },
@@ -153,6 +150,7 @@ fun HomeScreen(navController: NavController) {
             onPreferencesClick= { navController.navigate(Screen.Preferences.route) },
             isLoggedIn        = isLoggedIn,
             onLogoutClick     = { coroutineScope.launch { authService.logout() } },
+            onProfileClick    = { navController.navigate(Screen.Profile.route) },
             modifier          = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopStart)

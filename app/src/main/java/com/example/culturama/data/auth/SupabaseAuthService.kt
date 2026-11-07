@@ -22,6 +22,10 @@ import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.status.SessionStatus
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.CancellationException
@@ -123,9 +127,61 @@ class SupabaseAuthService private constructor() {
         return conferirConta()
     }
 
+    /**
+     * Nome, usuário, apresentação e foto que a sessão já trouxer.
+     * `null` quando não há conta autenticada.
+     */
+    fun contaAtual(): ContaAutenticada? {
+        val user = SupabaseProvider.client?.auth?.currentUserOrNull() ?: return null
+        val metadados = user.userMetadata
+        val identidade = user.identities.orEmpty().firstNotNullOfOrNull { it.identityData }
+        return ContaAutenticada(
+            nome = lerTexto(metadados, identidade, "nome", "name", "full_name", "display_name"),
+            nomeDeUsuario = lerTexto(
+                metadados,
+                identidade,
+                "username",
+                "preferred_username",
+                "user_name",
+                "apelido"
+            )?.removePrefix("@"),
+            apresentacao = lerTexto(metadados, identidade, "bio", "apresentacao", "about", "description"),
+            avatarUrl = lerTexto(
+                metadados,
+                identidade,
+                "avatar_url",
+                "picture",
+                "avatar",
+                "foto",
+                "photo_url"
+            )?.takeIf { it.startsWith("https://") || it.startsWith("http://") },
+            email = user.email?.trim()?.takeIf { it.isNotEmpty() }
+        )
+    }
+
     /** `null` quando não deu para saber, como numa falha de rede. */
     suspend fun isProfileComplete(): Boolean? =
         chamarApi { ApiClient.api.eu() }.getOrNull()?.usuario?.perfilCompleto
+
+    /**
+     * Grava o nome também nos metadados da sessão, que o menu já lê.
+     * Só a conta do token atual é alterada. Falha aqui não desfaz o cadastro em `users`.
+     */
+    suspend fun atualizarNomeNaSessao(nome: String): AuthResult<Unit> {
+        val client = SupabaseProvider.client
+            ?: return AuthResult.Error("Não foi possível atualizar o nome na sessão.")
+        return try {
+            client.auth.updateUser {
+                data = buildJsonObject { put("nome", JsonPrimitive(nome)) }
+            }
+            AuthResult.Success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w("CulturamaAuth", "Nome salvo no cadastro, mas a sessão não atualizou", e)
+            AuthResult.Error("O nome foi salvo, mas a sessão não atualizou.")
+        }
+    }
 
     /** Data de nascimento e aceite de quem criou a conta pelo Google. */
     suspend fun completeProfile(birthDateIso: String, privacyAccepted: Boolean): AuthResult<Unit> {
@@ -155,6 +211,18 @@ class SupabaseAuthService private constructor() {
         } catch (e: Exception) {
             client.auth.clearSession()
         }
+    }
+
+    private fun lerTexto(principal: JsonObject?, reserva: JsonObject?, vararg chaves: String): String? {
+        return chaves.firstNotNullOfOrNull { chave ->
+            textoEm(principal, chave) ?: textoEm(reserva, chave)
+        }
+    }
+
+    private fun textoEm(objeto: JsonObject?, chave: String): String? {
+        val primitivo = objeto?.get(chave) as? JsonPrimitive ?: return null
+        if (!primitivo.isString) return null
+        return primitivo.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }
     }
 
     private fun mensagemDe(e: AuthRestException): String = when (e.errorCode) {

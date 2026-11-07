@@ -23,4 +23,70 @@ sealed class Screen(val route: String) {
     }
     object SignUp          : Screen("signup")
     object CompleteProfile : Screen("complete_profile")
+    object Profile         : Screen("profile")
+    object Settings        : Screen("settings")
+    object UserSection     : Screen("user_section/{section}") {
+        fun createRoute(section: String): String = "user_section/$section"
+    }
+}
+
+/** Seções do menu do usuário que ainda não têm tela própria. */
+enum class SecaoDoUsuario(
+    val id: String,
+    val titulo: String,
+    val resumo: String,
+    val detalhe: String
+) {
+    FAVORITOS(
+        id = "favoritos",
+        titulo = "Meus favoritos",
+        resumo = "Seus eventos salvos aparecem aqui",
+        detalhe = "A lista completa dos eventos que você salvou entra numa próxima etapa."
+    ),
+    INTERESSES(
+        id = "interesses",
+        titulo = "Meus interesses",
+        resumo = "Samba, rap, capoeira, dança e outras cenas",
+        detalhe = "A edição de categorias e subcategorias culturais entra numa próxima etapa."
+    ),
+    COMENTARIOS(
+        id = "comentarios",
+        titulo = "Meus comentários",
+        resumo = "Textos que você publicou nos eventos",
+        detalhe = "O histórico dos seus comentários entra numa próxima etapa. Notas numéricas ficam em Minhas avaliações."
+    ),
+    AVALIACOES(
+        id = "avaliacoes",
+        titulo = "Minhas avaliações",
+        resumo = "Notas que você deu aos eventos",
+        detalhe = "As notas numéricas entram numa próxima etapa. Comentários em texto ficam em Meus comentários."
+    ),
+    EVENTOS(
+        id = "eventos",
+        titulo = "Meus eventos",
+        resumo = "Eventos que você cria ou gerencia",
+        detalhe = "A criação e o gerenciamento dos seus eventos entram numa próxima etapa, conforme a permissão da conta."
+    ),
+    TRAJETORIA(
+        id = "trajetoria",
+        titulo = "Minha trajetória cultural",
+        resumo = "Eventos em que você participou",
+        detalhe = "O histórico de participação entra numa próxima etapa. Ver ou favoritar um evento não conta como presença."
+    ),
+    ORGANIZACOES(
+        id = "organizacoes",
+        titulo = "Organizações e comunidades",
+        resumo = "Coletivos e espaços que você acompanha",
+        detalhe = "A área de organizações, coletivos e estabelecimentos entra numa próxima etapa."
+    ),
+    EDITAR_PERFIL(
+        id = "editar_perfil",
+        titulo = "Editar perfil",
+        resumo = "Foto, nome e apresentação",
+        detalhe = "A edição de foto, nome, usuário e apresentação entra numa próxima etapa."
+    );
+
+    companion object {
+        fun porId(id: String): SecaoDoUsuario? = entries.firstOrNull { it.id == id }
+    }
 }

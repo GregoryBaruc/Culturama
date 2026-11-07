@@ -47,6 +47,33 @@ object FormValidator {
     }
 
     /**
+     * Nome de exibição do perfil. Aceita um único nome: o cadastro do site
+     * guarda esse texto na coluna `nome`, sem exigir sobrenome.
+     */
+    fun validateDisplayName(name: String): FieldValidationResult {
+        val trimmed = name.trim()
+        return when {
+            trimmed.isEmpty() -> FieldValidationResult(
+                isValid = false,
+                errorMessage = "Digite o nome de exibição."
+            )
+            trimmed.length < 2 -> FieldValidationResult(
+                isValid = false,
+                errorMessage = "O nome precisa ter pelo menos 2 caracteres."
+            )
+            trimmed.length > 80 -> FieldValidationResult(
+                isValid = false,
+                errorMessage = "O nome pode ter no máximo 80 caracteres."
+            )
+            trimmed.any { it.isISOControl() } -> FieldValidationResult(
+                isValid = false,
+                errorMessage = "O nome não pode ter quebras de linha."
+            )
+            else -> FieldValidationResult(isValid = true)
+        }
+    }
+
+    /**
      * Valida o formato de e-mail.
      */
     fun validateEmail(email: String): FieldValidationResult {
