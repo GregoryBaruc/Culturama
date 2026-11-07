@@ -14,6 +14,7 @@ data class OpcaoCultural(
 data class GrupoCultural(
     val id: String,
     val nome: String,
+    val slug: String,
     val opcoes: List<OpcaoCultural>
 )
 
@@ -38,7 +39,7 @@ object CatalogoCultural {
         val opcoes = filhasValidas.ifEmpty {
             listOf(OpcaoCultural(idGrupo, nomeGrupo, slugGrupo))
         }
-        return GrupoCultural(idGrupo, nomeGrupo, opcoes)
+        return GrupoCultural(idGrupo, nomeGrupo, slugGrupo, opcoes)
     }
 
     private fun CategoriaArvoreDto.paraOpcao(): OpcaoCultural? {

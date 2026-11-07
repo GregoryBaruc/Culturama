@@ -59,7 +59,7 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.culturama.data.auth.ContaAutenticada
 import com.example.culturama.data.auth.SupabaseAuthService
-import com.example.culturama.data.favorite.LocalFavoriteRepository
+import com.example.culturama.data.favorite.RemoteFavoriteRepository
 import com.example.culturama.data.favorite.idDoUsuarioAutenticado
 import com.example.culturama.data.preference.UserPreferencesRepository
 import com.example.culturama.data.profile.Interesses
@@ -87,7 +87,7 @@ fun UserMenuScreen(
 ) {
     val context = LocalContext.current
     val preferences = remember { UserPreferencesRepository.getInstance(context) }
-    val favoritos = remember { LocalFavoriteRepository.from(context) }
+    val favoritos = remember { RemoteFavoriteRepository.instance }
     val versaoFavoritos by favoritos.alteracoes.collectAsState()
     var conta by remember { mutableStateOf<ContaAutenticada?>(null) }
     var carregandoConta by remember { mutableStateOf(true) }
@@ -117,12 +117,16 @@ fun UserMenuScreen(
         carregandoConta = false
     }
 
+    LaunchedEffect(Unit) {
+        idDoUsuarioAutenticado()?.let { favoritos.atualizar(it) }
+    }
+
     LaunchedEffect(versaoFavoritos) {
         val quantidade = idDoUsuarioAutenticado()?.let { favoritos.ids(it).size }
         resumoFavoritos = when (quantidade) {
             null, 0 -> null
-            1 -> "1 evento salvo neste aparelho"
-            else -> "$quantidade eventos salvos neste aparelho"
+            1 -> "1 evento salvo"
+            else -> "$quantidade eventos salvos"
         }
     }
 

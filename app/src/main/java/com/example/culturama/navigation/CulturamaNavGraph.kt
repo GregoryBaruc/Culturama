@@ -1,5 +1,6 @@
 ﻿package com.example.culturama.navigation
 
+import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -7,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -14,6 +16,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import com.example.culturama.data.auth.SupabaseAuthService
+import com.example.culturama.data.favorite.RemoteFavoriteRepository
 import com.example.culturama.data.remote.ApiClient
 import com.example.culturama.ui.screen.AccessScreen
 import com.example.culturama.ui.screen.CompleteProfileScreen
@@ -34,15 +37,23 @@ import com.example.culturama.ui.screen.UserSectionScreen
 
 @Composable
 fun CulturamaNavGraph(navController: NavHostController) {
-    // SessÃ£o encerrada pelo servidor: leva a pessoa para entrar de novo.
+    // Sessão encerrada pelo servidor: leva a pessoa para entrar de novo.
     LaunchedEffect(Unit) {
         ApiClient.sessaoEncerrada.collect {
             navController.navigate(Screen.Login.route) { launchSingleTop = true }
         }
     }
 
-    // Conta sem data de nascimento ou aceite sÃ³ segue depois de completar o cadastro.
-    // Confere a cada troca de tela atÃ© o perfil estar completo: login e abertura do app passam por aqui.
+    // Favorito que o servidor recusou: a tela já desfez o coração, falta dizer o motivo.
+    val contexto = LocalContext.current
+    LaunchedEffect(Unit) {
+        RemoteFavoriteRepository.instance.avisos.collect { aviso ->
+            Toast.makeText(contexto, aviso, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Conta sem data de nascimento ou aceite só segue depois de completar o cadastro.
+    // Confere a cada troca de tela até o perfil estar completo: login e abertura do app passam por aqui.
     val authService = remember { SupabaseAuthService.instance }
     val isLoggedIn by authService.isLoggedIn.collectAsState(initial = false)
     val rotaAtual = navController.currentBackStackEntryAsState().value?.destination?.route

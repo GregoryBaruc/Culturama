@@ -4,6 +4,7 @@ import com.google.gson.JsonElement
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -40,7 +41,7 @@ data class EventoResumoDto(
     val fonte: FonteDto?
 )
 
-data class ListaEventosDto(val eventos: List<EventoResumoDto>?)
+data class ListaEventosDto(val eventos: List<EventoResumoDto>?, val temMais: Boolean? = null)
 
 data class EventoDetalheDto(
     val id: String,
@@ -63,8 +64,16 @@ data class EventoDetalheDto(
 /** A API devolve o detalhe dentro de "evento". */
 data class RespostaEventoDto(val evento: EventoDetalheDto)
 
-data class UsuarioDto(val id: String?, val perfilCompleto: Boolean?)
+data class UsuarioDto(
+    val id: String? = null,
+    val perfilCompleto: Boolean? = null,
+    val nome: String? = null,
+    val interesses: List<String>? = null
+)
 data class RespostaEuDto(val usuario: UsuarioDto?)
+
+/** Campo nulo não vai no JSON: o servidor só muda o que foi enviado. */
+data class AtualizarContaBody(val nome: String? = null, val interesses: List<String>? = null)
 
 data class CompletarPerfilBody(val dataNascimento: String, val aceite: Boolean)
 
@@ -78,13 +87,14 @@ data class CadastroBody(
 
 data class FavoritoBody(val eventoId: String)
 
-/** Rotas do site. O login nÃ£o passa por aqui: Ã© feito pelo SDK do Supabase. */
+/** Rotas do site. O login não passa por aqui: é feito pelo SDK do Supabase. */
 interface CulturamaApi {
     @GET("eventos")
     suspend fun eventos(
         @Query("de") de: String? = null,
         @Query("ate") ate: String? = null,
-        @Query("limite") limite: Int? = null
+        @Query("limite") limite: Int? = null,
+        @Query("pagina") pagina: Int? = null
     ): ListaEventosDto
 
     @GET("eventos/{id}")
@@ -98,6 +108,9 @@ interface CulturamaApi {
 
     @GET("eu")
     suspend fun eu(): RespostaEuDto
+
+    @PATCH("eu")
+    suspend fun atualizarConta(@Body body: AtualizarContaBody): RespostaEuDto
 
     @POST("eu/completar")
     suspend fun completarPerfil(@Body body: CompletarPerfilBody)

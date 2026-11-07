@@ -29,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -40,7 +39,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.culturama.data.EventRepository
 import com.example.culturama.data.auth.SupabaseAuthService
-import com.example.culturama.data.favorite.LocalFavoriteRepository
+import com.example.culturama.data.favorite.RemoteFavoriteRepository
 import com.example.culturama.data.favorite.idDoUsuarioAutenticado
 import java.util.Calendar
 import java.util.TimeZone
@@ -49,13 +48,13 @@ import com.example.culturama.navigation.Screen
 import com.example.culturama.ui.component.*
 import com.example.culturama.ui.theme.*
 
-// â”€â”€â”€ Estado dos Filtros AvanÃ§ados â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Estado dos Filtros Avançados ─────────────────────────────────────────────
 
 data class AdvancedFiltersState(
     val category: String? = null,
     val startDay: Int? = null,
     val endDay: Int? = null,
-    val pricing: String = "Todas", // "Todas", "GrÃ¡tis", "Pago"
+    val pricing: String = "Todas", // "Todas", "Grátis", "Pago"
     val region: String? = null,
     val accessibilityOnly: Boolean = false
 ) {
@@ -63,7 +62,7 @@ data class AdvancedFiltersState(
         get() = category != null || startDay != null || endDay != null || pricing != "Todas" || region != null || accessibilityOnly
 }
 
-// â”€â”€â”€ Dados fictÃ­cios â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Dados fictícios ──────────────────────────────────────────────────────────
 
 internal val sampleEvents = listOf(
     EventModel(
@@ -76,7 +75,7 @@ internal val sampleEvents = listOf(
         time = "19:00",
         venueName = "Centro Cultural da Juventude, Zona Norte",
         isFree = true,
-        description = "Batalha tradicional reunindo MCs da regiÃ£o com rimas improvisadas e microfone aberto. EspaÃ§o amplo com rampa de acesso e banheiro acessÃ­vel."
+        description = "Batalha tradicional reunindo MCs da região com rimas improvisadas e microfone aberto. Espaço amplo com rampa de acesso e banheiro acessível."
     ),
     EventModel(
         id = "2",
@@ -88,7 +87,7 @@ internal val sampleEvents = listOf(
         time = "14:00",
         venueName = "Largo da Mem\u00f3ria, Centro",
         isFree = true,
-        description = "Tarde com clÃ¡ssicos do samba de raiz, partido alto e comunidade unida em torno da mÃºsica popular."
+        description = "Tarde com clássicos do samba de raiz, partido alto e comunidade unida em torno da música popular."
     ),
     EventModel(
         id = "3",
@@ -100,7 +99,7 @@ internal val sampleEvents = listOf(
         time = "18:30",
         venueName = "Associa\u00e7\u00e3o Cultural Ra\u00edzes, Zona Leste",
         isFree = true,
-        description = "VivÃªncia cultural e histÃ³rica com mestres e alunos de capoeira Angola, com berimbau e cÃ¢nticos ancestrais."
+        description = "Vivência cultural e histórica com mestres e alunos de capoeira Angola, com berimbau e cânticos ancestrais."
     ),
     EventModel(
         id = "4",
@@ -113,7 +112,7 @@ internal val sampleEvents = listOf(
         venueName = "Bar do Z\u00e9, Zona Sul",
         isFree = false,
         price = "R\$ 10,00",
-        description = "Microfone aberto para poetas independentes, declamaÃ§Ã£o de poesia marginal e mÃºsica acÃºstica."
+        description = "Microfone aberto para poetas independentes, declamação de poesia marginal e música acústica."
     ),
     EventModel(
         id = "5",
@@ -125,7 +124,7 @@ internal val sampleEvents = listOf(
         time = "09:00",
         venueName = "Pra\u00e7a da Liberdade, Centro",
         isFree = true,
-        description = "ExposiÃ§Ã£o ao ar livre com artesÃ£os locais, gastronomia tÃ­pica e artesanato sustentÃ¡vel. Local plano com fÃ¡cil circulaÃ§Ã£o e acessibilidade total para cadeirantes."
+        description = "Exposição ao ar livre com artesãos locais, gastronomia típica e artesanato sustentável. Local plano com fácil circulação e acessibilidade total para cadeirantes."
     ),
     EventModel(
         id = "6",
@@ -138,7 +137,7 @@ internal val sampleEvents = listOf(
         venueName = "Est\u00fadio Vivo, Zona Oeste",
         isFree = false,
         price = "R\$ 25,00",
-        description = "ApresentaÃ§Ã£o ao vivo de bandas autorais de indie rock, MPB e ritmos experimentais."
+        description = "Apresentação ao vivo de bandas autorais de indie rock, MPB e ritmos experimentais."
     ),
     EventModel(
         id = "7",
@@ -150,7 +149,7 @@ internal val sampleEvents = listOf(
         time = "10:00",
         venueName = "Pista do Ibirapuera, Zona Sul",
         isFree = true,
-        description = "CompetiÃ§Ã£o amadora aberta para todas as idades nas categorias street e bowl, com premiaÃ§Ãµes comunitÃ¡rias."
+        description = "Competição amadora aberta para todas as idades nas categorias street e bowl, com premiações comunitárias."
     ),
     EventModel(
         id = "8",
@@ -163,7 +162,7 @@ internal val sampleEvents = listOf(
         venueName = "Centro de Conven\u00e7\u00f5es Anhembi, Zona Norte",
         isFree = false,
         price = "R\$ 30,00",
-        description = "EspaÃ§o gamer com campeonatos de esports, concurso de cosplay, estandes e jogos de tabuleiro. PavilhÃ£o totalmente adaptado com elevadores e acessibilidade."
+        description = "Espaço gamer com campeonatos de esports, concurso de cosplay, estandes e jogos de tabuleiro. Pavilhão totalmente adaptado com elevadores e acessibilidade."
     ),
     EventModel(
         id = "9",
@@ -175,7 +174,7 @@ internal val sampleEvents = listOf(
         time = "10:00",
         venueName = "Beco da Arte, Centro",
         isFree = true,
-        description = "Oficina prÃ¡tica gratuita com noÃ§Ãµes bÃ¡sicas de desenho, sprays, tÃ©cnicas de stencil e muralismo comunitÃ¡rio."
+        description = "Oficina prática gratuita com noções básicas de desenho, sprays, técnicas de stencil e muralismo comunitário."
     ),
     EventModel(
         id = "10",
@@ -187,11 +186,11 @@ internal val sampleEvents = listOf(
         time = "17:00",
         venueName = "Largo do Arouche, Centro",
         isFree = true,
-        description = "ApresentaÃ§Ã£o ao ar livre de comÃ©dia dramÃ¡tica com elenco popular, com interpretaÃ§Ã£o em Libras e acesso livre para todos os pÃºblicos."
+        description = "Apresentação ao ar livre de comédia dramática com elenco popular, com interpretação em Libras e acesso livre para todos os públicos."
     )
 )
 
-// â”€â”€â”€ Modelos de filtros e categorias â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Modelos de filtros e categorias ─────────────────────────────────────────
 
 private data class QuickFilter(val label: String)
 
@@ -222,13 +221,12 @@ private val categories = listOf(
 
 private val regionsList = listOf("Centro", "Zona Sul", "Zona Norte", "Zona Leste", "Zona Oeste")
 
-// â”€â”€â”€ Tela Principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Tela Principal ───────────────────────────────────────────────────────────
 
 @Composable
 fun EventsScreen(navController: NavController) {
-    val context = LocalContext.current
     val authService = remember { SupabaseAuthService.instance }
-    val favoritos = remember { LocalFavoriteRepository.from(context) }
+    val favoritos = remember { RemoteFavoriteRepository.instance }
     val isLoggedIn by authService.isLoggedIn.collectAsState(initial = false)
     val versaoFavoritos by favoritos.alteracoes.collectAsState()
 
@@ -240,7 +238,7 @@ fun EventsScreen(navController: NavController) {
     LaunchedEffect(reloadKey) {
         isLoading = true
         errorMessage = null
-        EventRepository.getAllEvents(limite = 100)
+        EventRepository.getAllEvents()
             .onSuccess {
                 events = it
                 isLoading = false
@@ -263,7 +261,7 @@ fun EventsScreen(navController: NavController) {
         favoritedIds = userId?.let { favoritos.ids(it).toSet() } ?: emptySet()
     }
 
-    // Estado dos filtros avanÃ§ados persistidos
+    // Estado dos filtros avançados persistidos
     var advancedFilters by remember { mutableStateOf(AdvancedFiltersState()) }
 
     fun clearAllFilters() {
@@ -289,7 +287,7 @@ fun EventsScreen(navController: NavController) {
                 event.category.contains(query, ignoreCase = true) ||
                 event.venueName.contains(query, ignoreCase = true)
 
-            // 2. Filtros rÃ¡pidos
+            // 2. Filtros rápidos
             val matchesFilter = when (selectedFilter) {
                 "Gr\u00e1tis"        -> event.isFree
                 "Hoje"          -> event.dayOfMonth == (currentDayOfMonth as Int)
@@ -311,7 +309,7 @@ fun EventsScreen(navController: NavController) {
                 event.category.contains(selectedCategory!!, ignoreCase = true) ||
                 selectedCategory!!.contains(event.category, ignoreCase = true)
 
-            // 4. Filtros AvanÃ§ados
+            // 4. Filtros Avançados
             val matchesAdvCategory = advancedFilters.category == null ||
                 event.category.contains(advancedFilters.category!!, ignoreCase = true)
 
@@ -352,7 +350,7 @@ fun EventsScreen(navController: NavController) {
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
 
-            // â”€â”€ CabeÃ§alho â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Cabeçalho ─────────────────────────────────────────────────
             item {
                 EventsHeader(
                     searchQuery    = searchQuery,
@@ -363,7 +361,7 @@ fun EventsScreen(navController: NavController) {
                 )
             }
 
-            // â”€â”€ Filtros rÃ¡pidos + BotÃ£o Mais filtros â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Filtros rápidos + Botão Mais filtros ──────────────────────
             item {
                 QuickFiltersRow(
                     filters             = quickFilters,
@@ -374,7 +372,7 @@ fun EventsScreen(navController: NavController) {
                 )
             }
 
-            // â”€â”€ Categorias â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Categorias ────────────────────────────────────────────────
             item {
                 CategoriesSection(
                     categories       = categories,
@@ -385,7 +383,7 @@ fun EventsScreen(navController: NavController) {
                 )
             }
 
-            // â”€â”€ Contador de resultados e aÃ§Ãµes de filtro ativo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Contador de resultados e ações de filtro ativo ────────────
             item {
                 Row(
                     modifier = Modifier
@@ -459,7 +457,7 @@ fun EventsScreen(navController: NavController) {
                 }
             }
 
-            // â”€â”€ Cards de eventos ou mensagem de nenhum evento encontrado â”€â”€
+            // ── Cards de eventos ou mensagem de nenhum evento encontrado ──
             if (displayedEvents.isEmpty()) {
                 item {
                     EmptyEventsState(
@@ -498,7 +496,7 @@ fun EventsScreen(navController: NavController) {
         }
     }
 
-    // â”€â”€ Bottom Sheet de Filtros AvanÃ§ados â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Bottom Sheet de Filtros Avançados ─────────────────────────────────────────
     if (showMoreFiltersSheet) {
         MoreFiltersBottomSheet(
             currentFilters = advancedFilters,
@@ -515,7 +513,7 @@ fun EventsScreen(navController: NavController) {
     }
 }
 
-// â”€â”€â”€ Bottom Sheet de Filtros AvanÃ§ados â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Bottom Sheet de Filtros Avançados ────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -557,7 +555,7 @@ private fun MoreFiltersBottomSheet(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            // TÃ­tulo e botÃ£o fechar
+            // Título e botão fechar
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -582,7 +580,7 @@ private fun MoreFiltersBottomSheet(
                 }
             }
 
-            // â”€â”€ 1. PerÃ­odo (Dia inicial e Dia final) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── 1. Período (Dia inicial e Dia final) ─────────────────────
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text  = "Per\u00edodo (dias de Novembro)",
@@ -673,7 +671,7 @@ private fun MoreFiltersBottomSheet(
                 }
             }
 
-            // â”€â”€ 2. Entrada (Gratuito ou Pago) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── 2. Entrada (Gratuito ou Pago) ─────────────────────────────
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text  = "Entrada",
@@ -717,7 +715,7 @@ private fun MoreFiltersBottomSheet(
                 }
             }
 
-            // â”€â”€ 3. Cidade ou RegiÃ£o â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── 3. Cidade ou Região ───────────────────────────────────────
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text  = "Cidade ou Regi\u00e3o",
@@ -763,7 +761,7 @@ private fun MoreFiltersBottomSheet(
                 }
             }
 
-            // â”€â”€ 4. Categoria do evento â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── 4. Categoria do evento ────────────────────────────────────
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text  = "Categoria",
@@ -809,7 +807,7 @@ private fun MoreFiltersBottomSheet(
                 }
             }
 
-            // â”€â”€ 5. Acessibilidade â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── 5. Acessibilidade ─────────────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -855,7 +853,7 @@ private fun MoreFiltersBottomSheet(
 
             HorizontalDivider(color = Color(0xFF2A2A2E), thickness = 0.5.dp)
 
-            // â”€â”€ 6. BotÃµes: Limpar filtros e Aplicar filtros â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── 6. Botões: Limpar filtros e Aplicar filtros ────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -909,7 +907,7 @@ private fun MoreFiltersBottomSheet(
     }
 }
 
-// â”€â”€â”€ CabeÃ§alho â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Cabeçalho ───────────────────────────────────────────────────────────────
 
 @Composable
 private fun EventsHeader(
@@ -928,7 +926,7 @@ private fun EventsHeader(
             .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // TÃ­tulo da tela
+        // Título da tela
         Text(
             text  = "Eventos",
             style = MaterialTheme.typography.headlineLarge.copy(
@@ -937,7 +935,7 @@ private fun EventsHeader(
             )
         )
 
-        // Campo de busca + botÃµes de visualizaÃ§Ã£o
+        // Campo de busca + botões de visualização
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -1072,7 +1070,7 @@ private fun ViewToggleButton(
     }
 }
 
-// â”€â”€â”€ Filtros RÃ¡pidos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Filtros Rápidos ──────────────────────────────────────────────────────────
 
 @Composable
 private fun QuickFiltersRow(
@@ -1098,7 +1096,7 @@ private fun QuickFiltersRow(
             )
         }
 
-        // BotÃ£o "Mais filtros" com clique funcional e indicador visual
+        // Botão "Mais filtros" com clique funcional e indicador visual
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(20.dp))
@@ -1171,7 +1169,7 @@ private fun QuickFilterChip(
     }
 }
 
-// â”€â”€â”€ SeÃ§Ã£o de Categorias â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Seção de Categorias ──────────────────────────────────────────────────────
 
 @Composable
 private fun CategoriesSection(
@@ -1256,7 +1254,7 @@ private fun CategoryPill(
     }
 }
 
-// â”€â”€â”€ Estado vazio â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Estado vazio ─────────────────────────────────────────────────────────────
 
 @Composable
 private fun EmptyEventsState(
@@ -1304,7 +1302,7 @@ private fun EmptyEventsState(
     }
 }
 
-// â”€â”€â”€ Helpers de emoji/gradiente â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers de emoji/gradiente ──────────────────────────────────────────────
 
 internal fun eventsScreenEmoji(category: String): String = when {
     category.contains("Hip-Hop",   ignoreCase = true) -> "\uD83C\uDFA4"

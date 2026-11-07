@@ -64,7 +64,6 @@ fun MeusInteressesScreen(
     var podeSalvar by remember { mutableStateOf(false) }
     var grupos by remember { mutableStateOf<List<GrupoCultural>>(emptyList()) }
     var selecionados by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var salvosAntes by remember { mutableStateOf<List<String>>(emptyList()) }
     var mensagem by remember { mutableStateOf<String?>(null) }
     var mensagemEhErro by remember { mutableStateOf(false) }
 
@@ -87,7 +86,6 @@ fun MeusInteressesScreen(
             mensagemEhErro = true
         } else {
             grupos = lista
-            salvosAntes = conta.interesses
             selecionados = Interesses.selecionados(conta.interesses, lista)
             podeSalvar = true
         }
@@ -240,21 +238,18 @@ fun MeusInteressesScreen(
                 isLoading = salvando,
                 enabled = podeSalvar,
                 onClick = {
-                    val tokens = Interesses.tokensParaGravar(selecionados, salvosAntes, grupos)
-                    val anteriores = salvosAntes
+                    val tokens = Interesses.tokensParaGravar(selecionados, grupos)
                     val escolhaAtual = selecionados
                     scope.launch {
                         salvando = true
                         mensagem = null
                         PerfilRepository.salvarInteresses(tokens)
                             .onSuccess { gravados ->
-                                salvosAntes = gravados
                                 selecionados = Interesses.selecionados(gravados, grupos)
                                 mensagem = "Interesses salvos."
                                 mensagemEhErro = false
                             }
                             .onFailure { falha ->
-                                salvosAntes = anteriores
                                 selecionados = escolhaAtual
                                 mensagem = falha.message ?: "Não foi possível salvar. Tente de novo."
                                 mensagemEhErro = true

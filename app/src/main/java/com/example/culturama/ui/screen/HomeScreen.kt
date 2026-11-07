@@ -11,13 +11,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.culturama.data.EventRepository
 import com.example.culturama.data.auth.SupabaseAuthService
-import com.example.culturama.data.favorite.LocalFavoriteRepository
+import com.example.culturama.data.favorite.RemoteFavoriteRepository
 import com.example.culturama.data.favorite.idDoUsuarioAutenticado
 import com.example.culturama.model.EventModel
 import com.example.culturama.navigation.Screen
@@ -36,9 +35,8 @@ fun HomeScreen(navController: NavController) {
     val scrollState    = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
     val density        = LocalDensity.current
-    val context        = LocalContext.current
     val authService    = remember { SupabaseAuthService.instance }
-    val favoritos      = remember { LocalFavoriteRepository.from(context) }
+    val favoritos      = remember { RemoteFavoriteRepository.instance }
     val isLoggedIn by authService.isLoggedIn.collectAsState(initial = false)
     val versaoFavoritos by favoritos.alteracoes.collectAsState()
 

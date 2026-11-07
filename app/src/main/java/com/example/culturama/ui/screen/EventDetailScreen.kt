@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.culturama.data.EventRepository
 import com.example.culturama.data.auth.SupabaseAuthService
-import com.example.culturama.data.favorite.LocalFavoriteRepository
+import com.example.culturama.data.favorite.RemoteFavoriteRepository
 import com.example.culturama.data.favorite.idDoUsuarioAutenticado
 import com.example.culturama.model.EventModel
 import com.example.culturama.navigation.Screen
@@ -44,7 +44,7 @@ fun EventDetailScreen(
 ) {
     val context = LocalContext.current
     val authService = remember { SupabaseAuthService.instance }
-    val favoritos = remember { LocalFavoriteRepository.from(context) }
+    val favoritos = remember { RemoteFavoriteRepository.instance }
     val isLoggedIn by authService.isLoggedIn.collectAsState(initial = false)
     val versaoFavoritos by favoritos.alteracoes.collectAsState()
     val favorited = remember(isLoggedIn, versaoFavoritos, eventId) {

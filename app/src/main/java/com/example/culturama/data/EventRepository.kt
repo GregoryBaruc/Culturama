@@ -20,7 +20,7 @@ object EventRepository {
 
     private val FUSO = TimeZone.getTimeZone("America/Sao_Paulo")
     private val MESES = listOf("JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ")
-    private val DIAS = listOf("Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "SÃ¡b")
+    private val DIAS = listOf("Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb")
 
     suspend fun getWeekEvents(): Result<List<EventModel>> = chamarApi {
         val dia = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { timeZone = FUSO }
@@ -44,7 +44,7 @@ object EventRepository {
         if (favorite) ApiClient.api.favoritar(FavoritoBody(id)) else ApiClient.api.desfavoritar(id)
     }
 
-    /** O guia nÃ£o mostra o JSON de GET /favoritos: aceita lista direta ou objeto com a lista. */
+    /** O guia não mostra o JSON de GET /favoritos: aceita lista direta ou objeto com a lista. */
     private fun idsDeFavoritos(json: JsonElement): Set<String> {
         val lista = when {
             json.isJsonArray -> json.asJsonArray
@@ -64,8 +64,12 @@ object EventRepository {
         }.toSet()
     }
 
-    suspend fun getAllEvents(limite: Int = 100): Result<List<EventModel>> = chamarApi {
-        ApiClient.api.eventos(limite = limite).eventos.orEmpty().map { it.paraModelo() }
+    /** Todos os eventos no ar: a API entrega no máximo 100 por página. */
+    suspend fun getAllEvents(): Result<List<EventModel>> = chamarApi {
+        buscarTodasAsPaginas { numero ->
+            val resposta = ApiClient.api.eventos(limite = 100, pagina = numero)
+            Pagina(resposta.eventos.orEmpty(), resposta.temMais == true)
+        }.distinctBy { it.id }.map { it.paraModelo() }
     }
 
     private fun EventoResumoDto.paraModelo() = modelo(

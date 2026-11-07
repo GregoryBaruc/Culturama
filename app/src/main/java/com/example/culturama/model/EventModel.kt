@@ -1,7 +1,7 @@
 package com.example.culturama.model
 
 /**
- * Evento cultural vindo da API do site. Os campos de detalhe sÃ³ sÃ£o
+ * Evento cultural vindo da API do site. Os campos de detalhe só são
  * preenchidos depois de abrir o evento ([detailsLoaded]).
  */
 data class EventModel(

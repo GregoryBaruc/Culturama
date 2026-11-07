@@ -30,7 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -38,7 +37,7 @@ import androidx.navigation.NavController
 import com.example.culturama.data.EventRepository
 import com.example.culturama.data.auth.SupabaseAuthService
 import com.example.culturama.data.favorite.FavoriteRepository
-import com.example.culturama.data.favorite.LocalFavoriteRepository
+import com.example.culturama.data.favorite.RemoteFavoriteRepository
 import com.example.culturama.data.favorite.idDoUsuarioAutenticado
 import com.example.culturama.model.EventModel
 import com.example.culturama.navigation.Screen
@@ -52,17 +51,18 @@ import com.example.culturama.ui.theme.TextPrimary
 import com.example.culturama.ui.theme.TextSecondary
 
 /**
- * Lista local dos eventos salvos nesta instalação, da conta que está autenticada.
+ * Eventos salvos pela conta que está autenticada, os mesmos do site.
  */
 @Composable
 fun FavoritesScreen(
     navController: NavController,
     authService: SupabaseAuthService = remember { SupabaseAuthService.instance },
-    favoritos: FavoriteRepository = LocalFavoriteRepository.from(LocalContext.current)
+    favoritos: FavoriteRepository = remember { RemoteFavoriteRepository.instance }
 ) {
     val versao by favoritos.alteracoes.collectAsState()
     var userId by remember { mutableStateOf<String?>(null) }
     var carregando by remember { mutableStateOf(true) }
+    var falhou by remember { mutableStateOf(false) }
     var eventos by remember { mutableStateOf<List<Pair<String, EventModel?>>>(emptyList()) }
 
     LaunchedEffect(Unit) {
@@ -74,6 +74,10 @@ fun FavoritesScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        idDoUsuarioAutenticado()?.let { favoritos.atualizar(it) }
+    }
+
     LaunchedEffect(versao) {
         val id = idDoUsuarioAutenticado()
         userId = id
@@ -81,8 +85,14 @@ fun FavoritesScreen(
             carregando = false
             return@LaunchedEffect
         }
-        carregando = true
         val ids = favoritos.ids(id)
+        falhou = favoritos.falhouAoCarregar(id)
+        if (falhou) {
+            carregando = false
+            return@LaunchedEffect
+        }
+        carregando = true
+        if (!favoritos.carregado(id)) return@LaunchedEffect
         eventos = ids.map { eventoId -> eventoId to EventRepository.getEventDetails(eventoId).getOrNull() }
         carregando = false
     }
@@ -120,15 +130,29 @@ fun FavoritesScreen(
             )
         }
 
-        Text(
-            text = "Salvos neste aparelho.",
-            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
-        )
-
         when {
             carregando -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = CulturamaOrange)
+            }
+            falhou -> Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Não foi possível carregar os seus favoritos.",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        color = TextPrimary,
+                        textAlign = TextAlign.Center
+                    )
+                )
+                CulturamaPrimaryButton(
+                    text = "Tentar de novo",
+                    onClick = { userId?.let { favoritos.atualizar(it) } },
+                    modifier = Modifier.padding(top = 20.dp)
+                )
             }
             eventos.isEmpty() -> Column(
                 modifier = Modifier
