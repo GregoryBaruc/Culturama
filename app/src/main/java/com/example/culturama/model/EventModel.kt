@@ -25,5 +25,11 @@ data class EventModel(
     val siteUrl: String? = null,
     val isAccessible: Boolean = false,
     val accessibilityInfo: String = "",
-    val detailsLoaded: Boolean = false
-)
+    val detailsLoaded: Boolean = false,
+    val latitude: Double? = null,
+    val longitude: Double? = null
+) {
+    val temCoordenadas: Boolean
+        get() = latitude != null && longitude != null &&
+            latitude in -90.0..90.0 && longitude in -180.0..180.0
+}

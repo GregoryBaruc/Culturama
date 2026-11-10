@@ -80,8 +80,19 @@ fun CulturamaNavGraph(navController: NavHostController) {
         composable(Screen.Home.route) {
             HomeScreen(navController = navController)
         }
-        composable(Screen.Events.route) {
-            EventsScreen(navController = navController)
+        composable(
+            route = Screen.Events.route,
+            arguments = listOf(
+                navArgument("mapa") {
+                    type = NavType.BoolType
+                    defaultValue = false
+                }
+            )
+        ) { entrada ->
+            EventsScreen(
+                navController = navController,
+                abrirNoMapa = entrada.arguments?.getBoolean("mapa") == true
+            )
         }
         composable(
             route = "eventDetail?eventId={eventId}",

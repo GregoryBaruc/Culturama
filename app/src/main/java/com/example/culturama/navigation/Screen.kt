@@ -6,7 +6,9 @@ package com.example.culturama.navigation
  */
 sealed class Screen(val route: String) {
     object Home            : Screen("home")
-    object Events          : Screen("events")
+    object Events          : Screen("events?mapa={mapa}") {
+        fun createRoute(mapa: Boolean = false): String = "events?mapa=$mapa"
+    }
     object EventDetail     : Screen("eventDetail?eventId={eventId}")
     object Access          : Screen("access")
     object Preferences     : Screen("preferences")

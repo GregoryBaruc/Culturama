@@ -170,7 +170,7 @@ fun FavoritesScreen(
                 )
                 CulturamaPrimaryButton(
                     text = "Explorar eventos",
-                    onClick = { navController.navigate(Screen.Events.route) },
+                    onClick = { navController.navigate(Screen.Events.createRoute()) },
                     modifier = Modifier.padding(top = 20.dp)
                 )
             }

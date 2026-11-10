@@ -63,7 +63,7 @@ import com.example.culturama.ui.theme.TextTertiary
 private sealed interface EstadoDoPainel {
     data object Carregando : EstadoDoPainel
     data object Negado : EstadoDoPainel
-    data class Pronto(val visao: VisaoGeral) : EstadoDoPainel
+    data class Pronto(val visao: VisaoGeral, val papel: PapelNoPainel) : EstadoDoPainel
     data class Erro(val mensagem: String) : EstadoDoPainel
 }
 
@@ -101,7 +101,10 @@ fun AdminPainelScreen(
         estado = EstadoDoPainel.Carregando
         estado = AcessoAdministrativo.verificar().fold(
             onSuccess = { papel ->
-                if (papel == PapelNoPainel.ADMINISTRADOR) EstadoDoPainel.Pronto(VisaoGeral.indisponivel())
+                val pode =
+                    papel == PapelNoPainel.ADMINISTRADOR ||
+                        (papel == PapelNoPainel.MODERADOR && secao == SecaoDoPainel.EVENTOS)
+                if (pode) EstadoDoPainel.Pronto(VisaoGeral.indisponivel(), papel)
                 else EstadoDoPainel.Negado
             },
             onFailure = { erro ->
@@ -150,7 +153,7 @@ fun AdminPainelScreen(
             )
         }
 
-        if (estado is EstadoDoPainel.Pronto) {
+        if ((estado as? EstadoDoPainel.Pronto)?.papel == PapelNoPainel.ADMINISTRADOR) {
             SecoesDoPainel(
                 atual = secao,
                 onSelecionar = { destino ->
@@ -177,7 +180,11 @@ fun AdminPainelScreen(
 
             EstadoDoPainel.Negado -> AvisoDoPainel(
                 titulo = "Sem permissão",
-                texto = "O painel administrativo só abre quando o servidor marca a conta como administradora."
+                texto = if (secao == SecaoDoPainel.EVENTOS) {
+                    "A lista de eventos só abre quando o servidor marca a conta como administradora ou moderadora."
+                } else {
+                    "O painel administrativo só abre quando o servidor marca a conta como administradora."
+                }
             )
 
             is EstadoDoPainel.Erro -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -193,7 +200,9 @@ fun AdminPainelScreen(
                 }
             }
 
-            is EstadoDoPainel.Pronto -> ConteudoDaSecao(secao, atual.visao)
+            is EstadoDoPainel.Pronto -> Box(Modifier.weight(1f).fillMaxWidth()) {
+                ConteudoDaSecao(secao, atual.visao, atual.papel, navController)
+            }
         }
     }
 }
@@ -226,13 +235,17 @@ private fun SecoesDoPainel(atual: SecaoDoPainel?, onSelecionar: (SecaoDoPainel) 
 }
 
 @Composable
-private fun ConteudoDaSecao(secao: SecaoDoPainel?, visao: VisaoGeral) {
+private fun ConteudoDaSecao(
+    secao: SecaoDoPainel?,
+    visao: VisaoGeral,
+    papel: PapelNoPainel,
+    navController: NavController
+) {
     when (secao) {
         SecaoDoPainel.VISAO -> VisaoGeralDoPainel(visao)
-        SecaoDoPainel.EVENTOS, SecaoDoPainel.ANUNCIOS, SecaoDoPainel.EMPRESAS -> AvisoDoPainel(
-            titulo = "Em desenvolvimento",
-            texto = "A seção ${secao.titulo} entra numa próxima etapa. Nenhuma alteração é feita por aqui."
-        )
+        SecaoDoPainel.EVENTOS -> GerenciarEventosScreen(navController, papel)
+        SecaoDoPainel.ANUNCIOS -> GerenciarAnunciosScreen(papel)
+        SecaoDoPainel.EMPRESAS -> GerenciarEmpresasScreen(papel)
         null -> AvisoDoPainel(
             titulo = "Seção indisponível",
             texto = "Esta parte do painel não está disponível."

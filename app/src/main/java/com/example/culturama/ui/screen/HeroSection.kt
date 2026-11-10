@@ -17,9 +17,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavController
 import com.example.culturama.model.EventModel
-import com.example.culturama.navigation.Screen
 import com.example.culturama.ui.component.*
 import com.example.culturama.ui.theme.*
 
@@ -29,7 +27,7 @@ import com.example.culturama.ui.theme.*
  */
 @Composable
 fun HeroSection(
-    navController:  NavController,
+    onOpenMap:      () -> Unit,
     events:         List<EventModel>,
     onEventClick:   (EventModel) -> Unit,
     onEventsScroll: () -> Unit,
@@ -119,7 +117,7 @@ fun HeroSection(
 
             // ── Botão "Abrir o mapa" ──────────────────────────────────────
             Button(
-                onClick   = { navController.navigate(Screen.Access.route) },
+                onClick   = onOpenMap,
                 colors    = ButtonDefaults.buttonColors(
                     containerColor = CulturamaOrange,
                     contentColor   = Color.White

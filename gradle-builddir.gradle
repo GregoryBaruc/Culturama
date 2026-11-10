@@ -1,0 +1,5 @@
+// Mantido só por compatibilidade. O redirecionamento oficial está em settings.gradle.kts.
+allprojects {
+    def base = System.getenv("LOCALAPPDATA") ?: System.getProperty("java.io.tmpdir")
+    buildDir = file("${base}/culturama-build/${project.name}")
+}

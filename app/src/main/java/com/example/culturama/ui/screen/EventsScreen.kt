@@ -1,5 +1,8 @@
 package com.example.culturama.ui.screen
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -24,11 +27,14 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -38,6 +44,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.culturama.data.EventRepository
+import com.example.culturama.data.map.Coordenada
+import com.example.culturama.data.map.LocalizacaoAtual
+import com.example.culturama.data.map.distanciaEmKm
+import kotlinx.coroutines.launch
 import com.example.culturama.data.auth.SupabaseAuthService
 import com.example.culturama.data.favorite.RemoteFavoriteRepository
 import com.example.culturama.data.favorite.idDoUsuarioAutenticado
@@ -224,7 +234,9 @@ private val regionsList = listOf("Centro", "Zona Sul", "Zona Norte", "Zona Leste
 // ─── Tela Principal ───────────────────────────────────────────────────────────
 
 @Composable
-fun EventsScreen(navController: NavController) {
+fun EventsScreen(navController: NavController, abrirNoMapa: Boolean = false) {
+    val contexto = LocalContext.current
+    val escopo = rememberCoroutineScope()
     val authService = remember { SupabaseAuthService.instance }
     val favoritos = remember { RemoteFavoriteRepository.instance }
     val isLoggedIn by authService.isLoggedIn.collectAsState(initial = false)
@@ -252,9 +264,60 @@ fun EventsScreen(navController: NavController) {
     var searchQuery          by remember { mutableStateOf("") }
     var selectedFilter       by remember { mutableStateOf("Tudo") }
     var selectedCategory     by remember { mutableStateOf<String?>(null) }
-    var isListView           by remember { mutableStateOf(true) }
+    var isListView           by rememberSaveable { mutableStateOf(!abrirNoMapa) }
     var favoritedIds         by remember { mutableStateOf(setOf<String>()) }
     var showMoreFiltersSheet by remember { mutableStateOf(false) }
+    var mapaUi by remember { mutableStateOf(MapaUiState()) }
+
+    val pedidoLocal = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { resultado ->
+        val concedida = resultado[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            resultado[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (concedida) {
+            escopo.launch {
+                val aqui = LocalizacaoAtual.obter(contexto)
+                mapaUi = mapaUi.copy(
+                    userLocation = aqui,
+                    avisoLocal = if (aqui == null) {
+                        "Não foi possível obter a localização agora."
+                    } else {
+                        null
+                    }
+                )
+            }
+        } else {
+            mapaUi = mapaUi.copy(
+                avisoLocal = "Sem localização. O mapa segue disponível para navegar manualmente."
+            )
+        }
+    }
+
+  fun ativarPertoDeMim(daLista: Boolean) {
+        if (daLista) selectedFilter = "Perto de mim"
+        mapaUi = mapaUi.copy(
+            nearMeAtivo = true,
+            maxDistanceKm = mapaUi.maxDistanceKm ?: 10,
+            avisoLocal = null
+        )
+        pedidoLocal.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
+    }
+
+  fun aoEscolherFiltro(label: String) {
+        if (label == "Perto de mim") {
+            ativarPertoDeMim(daLista = true)
+        } else {
+            selectedFilter = label
+            if (mapaUi.nearMeAtivo) {
+                mapaUi = mapaUi.copy(nearMeAtivo = false, avisoLocal = null)
+            }
+        }
+    }
 
     LaunchedEffect(isLoggedIn, versaoFavoritos) {
         val userId = if (isLoggedIn) idDoUsuarioAutenticado() else null
@@ -278,7 +341,7 @@ fun EventsScreen(navController: NavController) {
 
     // Filtragem combinada
     val currentDayOfMonth = remember { Calendar.getInstance(TimeZone.getTimeZone("America/Sao_Paulo")).get(Calendar.DAY_OF_MONTH) }
-    val displayedEvents = remember(events, searchQuery, selectedFilter, selectedCategory, advancedFilters) {
+    val displayedEvents = remember(events, searchQuery, selectedFilter, selectedCategory, advancedFilters, mapaUi) {
         val query = searchQuery.trim()
         events.filter { event ->
             // 1. Pesquisa
@@ -300,7 +363,16 @@ fun EventsScreen(navController: NavController) {
                     combinedText.contains("rampa", ignoreCase = true) ||
                     combinedText.contains("adaptad", ignoreCase = true)
                 }
-                "Perto de mim"  -> true
+                "Perto de mim" -> when {
+                    !mapaUi.nearMeAtivo || mapaUi.userLocation == null -> true
+                    !event.temCoordenadas -> false
+                    else -> {
+                        val origem = mapaUi.userLocation!!
+                        val destino = Coordenada(event.latitude!!, event.longitude!!)
+                        val km = distanciaEmKm(origem, destino)
+                        mapaUi.maxDistanceKm?.let { km <= it } ?: true
+                    }
+                }
                 else            -> true
             }
 
@@ -343,7 +415,33 @@ fun EventsScreen(navController: NavController) {
     }
 
     Scaffold(containerColor = CulturamaBackground) { innerPadding ->
-        LazyColumn(
+        val topoComum: @Composable () -> Unit = {
+            EventsHeader(
+                searchQuery    = searchQuery,
+                onSearchChange = { searchQuery = it },
+                onClearSearch  = { searchQuery = "" },
+                isListView     = isListView,
+                onToggleView   = { isListView = !isListView }
+            )
+            QuickFiltersRow(
+                filters           = quickFilters,
+                selectedFilter    = selectedFilter,
+                onFilterSelect    = { aoEscolherFiltro(it) },
+                isAdvancedActive  = advancedFilters.isActive,
+                onOpenMoreFilters = { showMoreFiltersSheet = true }
+            )
+        }
+
+        if (!isListView) {
+            MapaEventosScreen(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                events = events,
+                navController = navController,
+                onMostrarLista = { isListView = true }
+            )
+        } else LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
@@ -351,26 +449,7 @@ fun EventsScreen(navController: NavController) {
         ) {
 
             // ── Cabeçalho ─────────────────────────────────────────────────
-            item {
-                EventsHeader(
-                    searchQuery    = searchQuery,
-                    onSearchChange = { searchQuery = it },
-                    onClearSearch  = { searchQuery = "" },
-                    isListView     = isListView,
-                    onToggleView   = { isListView = !isListView }
-                )
-            }
-
-            // ── Filtros rápidos + Botão Mais filtros ──────────────────────
-            item {
-                QuickFiltersRow(
-                    filters             = quickFilters,
-                    selectedFilter      = selectedFilter,
-                    onFilterSelect      = { selectedFilter = it },
-                    isAdvancedActive    = advancedFilters.isActive,
-                    onOpenMoreFilters   = { showMoreFiltersSheet = true }
-                )
-            }
+            item { topoComum() }
 
             // ── Categorias ────────────────────────────────────────────────
             item {

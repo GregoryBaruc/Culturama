@@ -38,7 +38,9 @@ data class EventoResumoDto(
     val gratuito: Boolean?,
     val acessivel: Boolean? = null,
     val categoria: CategoriaDto?,
-    val fonte: FonteDto?
+    val fonte: FonteDto?,
+    val latitude: Double? = null,
+    val longitude: Double? = null
 )
 
 data class ListaEventosDto(val eventos: List<EventoResumoDto>?, val temMais: Boolean? = null)
@@ -58,7 +60,9 @@ data class EventoDetalheDto(
     val linkSaibaMais: String?,
     val organizador: OrganizadorDto?,
     val urlNoSite: String?,
-    val acessibilidade: AcessibilidadeDto? = null
+    val acessibilidade: AcessibilidadeDto? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null
 )
 
 /** A API devolve o detalhe dentro de "evento". */

@@ -92,7 +92,12 @@ fun HomeScreen(navController: NavController) {
                 }
             ) {
                 HeroSection(
-                    navController  = navController,
+                    onOpenMap      = {
+                        navController.navigate(
+                            if (isLoggedIn) Screen.Events.createRoute(mapa = true)
+                            else Screen.Access.route
+                        )
+                    },
                     events         = events,
                     onEventClick   = { event -> selectedEvent = event },
                     onEventsScroll = {
@@ -139,8 +144,13 @@ fun HomeScreen(navController: NavController) {
 
         // ── Cabeçalho fixo sobreposto ──────────────────────────────────────
         CulturamaTopBar(
-            onEventsClick     = { navController.navigate(Screen.Events.route) },
-            onMapClick        = { navController.navigate(Screen.Access.route) },
+            onEventsClick     = { navController.navigate(Screen.Events.createRoute()) },
+            onMapClick        = {
+                navController.navigate(
+                    if (isLoggedIn) Screen.Events.createRoute(mapa = true)
+                    else Screen.Access.route
+                )
+            },
             onOrganizersClick = { navController.navigate(Screen.Organizers.route) },
             onCompaniesClick  = { /* TODO: próxima etapa */ },
             onLoginClick      = { navController.navigate(Screen.Login.route) },

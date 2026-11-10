@@ -1,6 +1,7 @@
 package com.example.culturama.ui.screen
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,6 +40,7 @@ import com.example.culturama.data.admin.AcessoAdministrativo
 import com.example.culturama.data.admin.PapelNoPainel
 import com.example.culturama.data.auth.SupabaseAuthService
 import com.example.culturama.navigation.Screen
+import com.example.culturama.navigation.SecaoDoPainel
 import com.example.culturama.ui.theme.CulturamaBackground
 import com.example.culturama.ui.theme.CulturamaCard
 import com.example.culturama.ui.theme.CulturamaOrange
@@ -46,10 +48,10 @@ import com.example.culturama.ui.theme.TextPrimary
 import com.example.culturama.ui.theme.TextSecondary
 
 private val AREAS = listOf(
-    "Revisão de eventos",
-    "Eventos, conforme a autorização da conta",
-    "Comentários",
-    "Denúncias"
+    "Revisão de eventos" to null,
+    "Eventos, conforme a autorização da conta" to SecaoDoPainel.EVENTOS,
+    "Comentários" to null,
+    "Denúncias" to null
 )
 
 /**
@@ -147,18 +149,29 @@ fun ModeracaoScreen(
             ) {
                 Cartao(
                     titulo = "Em desenvolvimento",
-                    texto = "O painel de moderação ainda não executa ações. Quando existir, a conta moderadora trabalha nestas filas:",
+                    texto = "Revisão, comentários e denúncias ainda não executam ações. Eventos abre a lista do painel, e a permissão é conferida de novo.",
                     modifier = Modifier
                 )
-                AREAS.forEach { area ->
+                AREAS.forEach { (area, secao) ->
                     Text(
                         text = area,
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
                             .background(CulturamaCard)
+                            .then(
+                                if (secao != null) {
+                                    Modifier.clickable {
+                                        navController.navigate(Screen.AdminPainel.createRoute(secao))
+                                    }
+                                } else {
+                                    Modifier
+                                }
+                            )
                             .padding(horizontal = 16.dp, vertical = 14.dp),
-                        style = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary)
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            color = if (secao != null) CulturamaOrange else TextPrimary
+                        )
                     )
                 }
                 Text(

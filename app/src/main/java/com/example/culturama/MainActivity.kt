@@ -1,6 +1,7 @@
 package com.example.culturama
 
 import android.os.Bundle
+import org.osmdroid.config.Configuration
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -13,6 +14,10 @@ import com.example.culturama.ui.theme.CulturamaTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Configuration.getInstance().apply {
+            userAgentValue = packageName
+            osmdroidBasePath = cacheDir
+        }
         enableEdgeToEdge()
         setContent {
             CulturamaTheme {

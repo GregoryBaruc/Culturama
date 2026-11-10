@@ -73,7 +73,8 @@ object EventRepository {
     }
 
     private fun EventoResumoDto.paraModelo() = modelo(
-        id, titulo, dataHora, endereco, imagemCapa, gratuito, acessivel, categoria, fonte
+        id, titulo, dataHora, endereco, imagemCapa, gratuito, acessivel, categoria, fonte,
+        latitude, longitude
     )
 
     private fun EventoDetalheDto.paraModelo(): EventModel {
@@ -84,7 +85,8 @@ object EventRepository {
         }.joinToString(", ")
 
         return modelo(
-            id, titulo, dataHora, endereco, imagemCapa, gratuito, acessivel, categoria, fonte
+            id, titulo, dataHora, endereco, imagemCapa, gratuito, acessivel, categoria, fonte,
+            latitude, longitude
         ).copy(
             description = descricao.orEmpty(),
             organizerName = organizador?.nome.orEmpty(),
@@ -106,7 +108,9 @@ object EventRepository {
         gratuito: Boolean?,
         acessivel: Boolean?,
         categoria: CategoriaDto?,
-        fonte: FonteDto?
+        fonte: FonteDto?,
+        latitude: Double? = null,
+        longitude: Double? = null
     ): EventModel {
         val calendario = lerData(dataHora)?.let { data ->
             Calendar.getInstance(FUSO).apply { time = data }
@@ -125,7 +129,9 @@ object EventRepository {
             imageUrl = imagemCapa,
             sourceName = fonte?.nome,
             sourceUrl = fonte?.link,
-            isAccessible = acessivel == true
+            isAccessible = acessivel == true,
+            latitude = latitude,
+            longitude = longitude
         )
     }
 
