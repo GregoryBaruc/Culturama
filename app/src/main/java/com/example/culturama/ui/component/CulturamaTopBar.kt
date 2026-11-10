@@ -37,6 +37,7 @@ fun CulturamaTopBar(
     onSignUpClick: () -> Unit,
     modifier: Modifier = Modifier,
     onPreferencesClick: () -> Unit = {},
+    onAcessosClick: () -> Unit = {},
     isLoggedIn: Boolean = false,
     onLogoutClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
@@ -116,10 +117,11 @@ fun CulturamaTopBar(
             ) {
                 if (isLoggedIn) {
                     NavMenuItem("Perfil", onProfileClick) { menuExpanded = false }
+                    NavMenuItem("Meus Interesses", onPreferencesClick) { menuExpanded = false }
                 }
                 NavMenuItem("Eventos",           onEventsClick)     { menuExpanded = false }
-                NavMenuItem("Meus Interesses",   onPreferencesClick){ menuExpanded = false }
                 NavMenuItem("Mapa",              onMapClick)        { menuExpanded = false }
+                NavMenuItem("Acessos",           onAcessosClick)    { menuExpanded = false }
                 NavMenuItem("Para organizadores",onOrganizersClick) { menuExpanded = false }
                 NavMenuItem("Para empresas",     onCompaniesClick)  { menuExpanded = false }
 

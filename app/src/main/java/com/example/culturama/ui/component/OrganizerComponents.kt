@@ -373,8 +373,7 @@ private fun OrganizerBenefitCard(
             ),
         shape = RoundedCornerShape(16.dp),
         color = Color(0xFF18181C),
-        border = BorderStroke(1.dp, Color(0xFF282830)),
-        shadowElevation = 4.dp
+        border = BorderStroke(1.dp, Color(0xFF282830))
     ) {
         Row(
             modifier = Modifier
@@ -572,15 +571,7 @@ fun OrganizerCollectiveCtaSection(
             .padding(horizontal = 16.dp),
         shape = RoundedCornerShape(22.dp),
         color = Color(0xFF171315),
-        border = BorderStroke(
-            1.dp,
-            Brush.verticalGradient(
-                listOf(
-                    CulturamaOrange.copy(alpha = 0.5f),
-                    Color(0xFF2A2A34)
-                )
-            )
-        ),
+        border = BorderStroke(1.dp, CulturamaOrange.copy(alpha = 0.45f)),
         shadowElevation = 8.dp
     ) {
         Box(

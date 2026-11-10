@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.culturama.data.acesso.IntencaoDeAcesso
 import com.example.culturama.data.auth.AuthResult
 import com.example.culturama.data.auth.SupabaseAuthService
 import com.example.culturama.data.preference.UserPreferencesRepository
@@ -52,6 +53,7 @@ import kotlinx.coroutines.launch
 fun LoginScreen(
     navController: NavController,
     initialEmail: String = "",
+    destino: String = IntencaoDeAcesso.DESCOBERTA.id,
     authService: SupabaseAuthService = remember { SupabaseAuthService.instance }
 ) {
     val context = LocalContext.current
@@ -90,13 +92,28 @@ fun LoginScreen(
      * - Se as preferências ainda não foram configuradas: abre a tela de Preferências.
      * - Se já foram configuradas: retorna à Tela Inicial sem duplicar a pilha.
      */
+    val intencao = IntencaoDeAcesso.porId(destino)
+
     fun navigateAfterLogin() {
-        if (!preferencesRepository.isPreferencesConfigured()) {
-            navController.navigate(Screen.Preferences.route) {
-                popUpTo(Screen.Login.route) { inclusive = true }
+        when (intencao) {
+            IntencaoDeAcesso.PERFIL -> navController.navigate(Screen.Profile.route) {
+                popUpTo(Screen.Home.route) { inclusive = false }
+                launchSingleTop = true
             }
-        } else {
-            navigateBackToHome()
+            IntencaoDeAcesso.ORGANIZADOR, IntencaoDeAcesso.EMPRESA ->
+                navController.navigate(Screen.AreaDaConta.createRoute(intencao.id)) {
+                    popUpTo(Screen.Home.route) { inclusive = false }
+                    launchSingleTop = true
+                }
+            IntencaoDeAcesso.DESCOBERTA -> {
+                if (!preferencesRepository.isPreferencesConfigured()) {
+                    navController.navigate(Screen.Preferences.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                } else {
+                    navigateBackToHome()
+                }
+            }
         }
     }
 
@@ -202,6 +219,7 @@ fun LoginScreen(
                     }
 
                     // Acesso direto a criar conta
+                    if (intencao == IntencaoDeAcesso.DESCOBERTA || intencao == IntencaoDeAcesso.PERFIL) {
                     TextButton(
                         onClick = {
                             navController.navigate(Screen.SignUp.route) {
@@ -217,12 +235,34 @@ fun LoginScreen(
                             )
                         )
                     }
+                    } else {
+                        Spacer(Modifier.size(40.dp))
+                    }
                 }
 
                 Spacer(Modifier.height(8.dp))
 
                 // ── Banner da referência ─────────────────────────────────────
-                AuthHeroBanner(isSignUp = false)
+                if (intencao == IntencaoDeAcesso.DESCOBERTA || intencao == IntencaoDeAcesso.PERFIL) {
+                    AuthHeroBanner(isSignUp = false)
+                } else {
+                    Text(
+                        text = if (intencao == IntencaoDeAcesso.EMPRESA) {
+                            "Patrocínio e inteligência cultural"
+                        } else {
+                            "Publicação de eventos"
+                        },
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                    Text(
+                        text = "A sessão é a mesma da conta cultural. Este login não concede o papel.",
+                        style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary),
+                        modifier = Modifier.padding(top = 6.dp, bottom = 8.dp)
+                    )
+                }
 
                 Spacer(Modifier.height(16.dp))
 
@@ -243,7 +283,12 @@ fun LoginScreen(
                     ) {
                         // Título do Card
                         Text(
-                            text = "Entrar",
+                            text = when (intencao) {
+                                IntencaoDeAcesso.ORGANIZADOR -> "Entrar como organizador"
+                                IntencaoDeAcesso.EMPRESA -> "Entrar como empresa"
+                                IntencaoDeAcesso.PERFIL -> "Entrar no perfil"
+                                IntencaoDeAcesso.DESCOBERTA -> "Entrar"
+                            },
                             style = MaterialTheme.typography.headlineLarge.copy(
                                 color = TextPrimary,
                                 fontWeight = FontWeight.Bold,
@@ -253,7 +298,13 @@ fun LoginScreen(
 
                         // Subtítulo
                         Text(
-                            text = "Acesse sua conta para descobrir os eventos da sua cidade.",
+                            text = when (intencao) {
+                                IntencaoDeAcesso.ORGANIZADOR ->
+                                    "Depois do login, a área abre só se esta conta já for organizador autorizado."
+                                IntencaoDeAcesso.EMPRESA ->
+                                    "Depois do login, o Insights abre só se a empresa desta conta já estiver aprovada."
+                                else -> "Acesse sua conta para descobrir os eventos da sua cidade."
+                            },
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 color = TextSecondary,
                                 fontSize = 13.5.sp

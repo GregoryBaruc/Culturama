@@ -20,6 +20,7 @@ import com.example.culturama.data.favorite.RemoteFavoriteRepository
 import com.example.culturama.data.favorite.idDoUsuarioAutenticado
 import com.example.culturama.model.EventModel
 import com.example.culturama.navigation.Screen
+import com.example.culturama.navigation.SecaoDoUsuario
 import com.example.culturama.ui.component.*
 import com.example.culturama.ui.section.WeekEventsSection
 import com.example.culturama.ui.theme.*
@@ -151,10 +152,14 @@ fun HomeScreen(navController: NavController) {
                 )
             },
             onOrganizersClick = { navController.navigate(Screen.Organizers.route) },
-            onCompaniesClick  = { /* TODO: próxima etapa */ },
-            onLoginClick      = { navController.navigate(Screen.Login.route) },
+            onCompaniesClick  = { navController.navigate(Screen.ParaEmpresas.route) },
+            onLoginClick      = { navController.navigate(Screen.Acessos.route) },
             onSignUpClick     = { navController.navigate(Screen.SignUp.route) },
-            onPreferencesClick= { navController.navigate(Screen.Preferences.route) },
+            onPreferencesClick= {
+                navController.navigate(Screen.UserSection.createRoute(SecaoDoUsuario.INTERESSES.id))
+            },
+            onAcessosClick    = { navController.navigate(Screen.Acessos.route) },
+
             isLoggedIn        = isLoggedIn,
             onLogoutClick     = { coroutineScope.launch { authService.logout() } },
             onProfileClick    = { navController.navigate(Screen.Profile.route) },

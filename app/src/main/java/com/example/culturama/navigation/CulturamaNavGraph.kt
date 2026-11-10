@@ -20,6 +20,8 @@ import com.example.culturama.data.favorite.RemoteFavoriteRepository
 import com.example.culturama.data.remote.ApiClient
 import com.example.culturama.ui.screen.AdminPainelScreen
 import com.example.culturama.ui.screen.AccessScreen
+import com.example.culturama.ui.screen.AcessosScreen
+import com.example.culturama.ui.screen.AreaDaContaScreen
 import com.example.culturama.ui.screen.CompleteProfileScreen
 import com.example.culturama.ui.screen.HomeScreen
 import com.example.culturama.ui.screen.EditProfileScreen
@@ -29,11 +31,13 @@ import com.example.culturama.ui.screen.MeusInteressesScreen
 import com.example.culturama.ui.screen.ModeracaoScreen
 import com.example.culturama.ui.screen.OrganizerAccessScreen
 import com.example.culturama.ui.screen.OrganizersScreen
+import com.example.culturama.ui.screen.ParaEmpresasScreen
 import com.example.culturama.ui.screen.PreferencesScreen
 import com.example.culturama.ui.screen.EventsScreen
 import com.example.culturama.ui.screen.EventDetailScreen
 import com.example.culturama.ui.screen.SettingsScreen
 import com.example.culturama.ui.screen.SignUpScreen
+import com.example.culturama.ui.screen.SolicitacaoDeAcessoScreen
 import com.example.culturama.ui.screen.UserMenuScreen
 import com.example.culturama.ui.screen.UserSectionScreen
 
@@ -107,21 +111,67 @@ fun CulturamaNavGraph(navController: NavHostController) {
         composable(Screen.Organizers.route) {
             OrganizersScreen(navController = navController)
         }
+        composable(Screen.ParaEmpresas.route) {
+            ParaEmpresasScreen(navController = navController)
+        }
         composable(Screen.OrganizerAccess.route) {
             OrganizerAccessScreen(navController = navController)
         }
         composable(
-            route = "login?email={email}",
+            route = "acessos?foco={foco}",
             arguments = listOf(
-                navArgument("email") {
+                navArgument("foco") {
                     type = NavType.StringType
                     defaultValue = ""
                     nullable = true
                 }
             )
+        ) { entrada ->
+            AcessosScreen(
+                navController = navController,
+                foco = entrada.arguments?.getString("foco").orEmpty()
+            )
+        }
+        composable(
+            route = Screen.AreaDaConta.route,
+            arguments = listOf(navArgument("tipo") { type = NavType.StringType })
+        ) { entrada ->
+            AreaDaContaScreen(
+                navController = navController,
+                tipo = entrada.arguments?.getString("tipo").orEmpty()
+            )
+        }
+        composable(
+            route = Screen.SolicitacaoDeAcesso.route,
+            arguments = listOf(navArgument("tipo") { type = NavType.StringType })
+        ) { entrada ->
+            SolicitacaoDeAcessoScreen(
+                navController = navController,
+                tipo = entrada.arguments?.getString("tipo").orEmpty()
+            )
+        }
+        composable(
+            route = "login?email={email}&destino={destino}",
+            arguments = listOf(
+                navArgument("email") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                    nullable = true
+                },
+                navArgument("destino") {
+                    type = NavType.StringType
+                    defaultValue = "descoberta"
+                    nullable = true
+                }
+            )
         ) { backStackEntry ->
             val email = backStackEntry.arguments?.getString("email").orEmpty()
-            LoginScreen(navController = navController, initialEmail = email)
+            val destino = backStackEntry.arguments?.getString("destino").orEmpty()
+            LoginScreen(
+                navController = navController,
+                initialEmail = email,
+                destino = destino
+            )
         }
         composable(Screen.SignUp.route) {
             SignUpScreen(navController = navController)

@@ -1,5 +1,7 @@
 package com.example.culturama.navigation
 
+import android.net.Uri
+
 /**
  * Rotas de navegação do aplicativo Culturama.
  * Centralizadas para manter uma arquitetura escalável e desacoplada.
@@ -13,15 +15,27 @@ sealed class Screen(val route: String) {
     object Access          : Screen("access")
     object Preferences     : Screen("preferences")
     object Organizers      : Screen("organizers")
+    object ParaEmpresas    : Screen("para_empresas")
     object OrganizerAccess : Screen("organizer_access")
     object Login           : Screen("login") {
-        fun createRoute(registeredEmail: String? = null): String {
-            return if (!registeredEmail.isNullOrBlank()) {
-                "login?email=$registeredEmail"
-            } else {
-                "login"
+        fun createRoute(registeredEmail: String? = null, destino: String? = null): String {
+            val params = mutableListOf<String>()
+            if (!registeredEmail.isNullOrBlank()) params += "email=${Uri.encode(registeredEmail)}"
+            if (!destino.isNullOrBlank() && destino != "descoberta") {
+                params += "destino=${Uri.encode(destino)}"
             }
+            return if (params.isEmpty()) "login" else "login?${params.joinToString("&")}"
         }
+    }
+    object Acessos         : Screen("acessos") {
+        fun createRoute(foco: String = ""): String =
+            if (foco.isBlank()) "acessos" else "acessos?foco=${Uri.encode(foco)}"
+    }
+    object AreaDaConta     : Screen("area/{tipo}") {
+        fun createRoute(tipo: String): String = "area/${Uri.encode(tipo)}"
+    }
+    object SolicitacaoDeAcesso : Screen("solicitacao/{tipo}") {
+        fun createRoute(tipo: String): String = "solicitacao/${Uri.encode(tipo)}"
     }
     object SignUp          : Screen("signup")
     object CompleteProfile : Screen("complete_profile")
