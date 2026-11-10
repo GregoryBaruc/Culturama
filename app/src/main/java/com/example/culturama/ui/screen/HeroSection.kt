@@ -34,7 +34,8 @@ fun HeroSection(
     modifier:       Modifier = Modifier
 ) {
     val screenHeight = LocalConfiguration.current.screenHeightDp.dp
-    val heroHeight   = maxOf(screenHeight, 640.dp)
+    // Hero compacto o bastante para a seção de eventos aparecer cedo, sem colar demais.
+    val heroHeight = (screenHeight * 0.74f).coerceIn(520.dp, 660.dp)
 
     Box(
         modifier = modifier
@@ -67,15 +68,16 @@ fun HeroSection(
             modifier     = Modifier.fillMaxSize()
         )
 
-        // ── Conteúdo central ─────────────────────────────────────────────
+        // ── Apresentação no topo (nome destaca fora do meio dos cards) ───
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.Center)
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
                 .padding(horizontal = 24.dp)
-                .padding(top = 80.dp),
+                .padding(top = 64.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // Identificador pequeno
             HeroIdentifier()
@@ -140,19 +142,6 @@ fun HeroSection(
                 )
             }
         }
-
-        // ── Gradiente de transição para seção de eventos ──────────────────
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp)
-                .align(Alignment.BottomCenter)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.Transparent, Color(0xFFF5F0EB))
-                    )
-                )
-        )
     }
 }
 
@@ -174,13 +163,14 @@ fun FloatingImages(
     onEventClick: (EventModel) -> Unit,
     modifier:     Modifier = Modifier
 ) {
+    // Cards um pouco mais baixos para o título "Culturama" ficar livre no centro-topo.
     val specs = listOf(
-        FloatSpec(isLeft = true,  topFrac = 0.10f, edgeDP = 8.dp,  width = 90.dp,  height = 115.dp, rotation = -8f,  phase = 0.0f),
-        FloatSpec(isLeft = true,  topFrac = 0.38f, edgeDP = 4.dp,  width = 100.dp, height = 125.dp, rotation =  5f,  phase = 0.3f),
-        FloatSpec(isLeft = true,  topFrac = 0.60f, edgeDP = 12.dp, width = 85.dp,  height = 105.dp, rotation = -5f,  phase = 0.6f),
-        FloatSpec(isLeft = false, topFrac = 0.08f, edgeDP = 8.dp,  width = 85.dp,  height = 100.dp, rotation =  8f,  phase = 0.2f),
-        FloatSpec(isLeft = false, topFrac = 0.36f, edgeDP = 4.dp,  width = 95.dp,  height = 120.dp, rotation = -6f,  phase = 0.5f),
-        FloatSpec(isLeft = false, topFrac = 0.60f, edgeDP = 10.dp, width = 88.dp,  height = 110.dp, rotation =  4f,  phase = 0.8f),
+        FloatSpec(isLeft = true,  topFrac = 0.22f, edgeDP = 8.dp,  width = 90.dp,  height = 115.dp, rotation = -8f,  phase = 0.0f),
+        FloatSpec(isLeft = true,  topFrac = 0.48f, edgeDP = 4.dp,  width = 100.dp, height = 125.dp, rotation =  5f,  phase = 0.3f),
+        FloatSpec(isLeft = true,  topFrac = 0.68f, edgeDP = 12.dp, width = 85.dp,  height = 105.dp, rotation = -5f,  phase = 0.6f),
+        FloatSpec(isLeft = false, topFrac = 0.20f, edgeDP = 8.dp,  width = 85.dp,  height = 100.dp, rotation =  8f,  phase = 0.2f),
+        FloatSpec(isLeft = false, topFrac = 0.46f, edgeDP = 4.dp,  width = 95.dp,  height = 120.dp, rotation = -6f,  phase = 0.5f),
+        FloatSpec(isLeft = false, topFrac = 0.68f, edgeDP = 10.dp, width = 88.dp,  height = 110.dp, rotation =  4f,  phase = 0.8f),
     )
 
     BoxWithConstraints(modifier = modifier) {

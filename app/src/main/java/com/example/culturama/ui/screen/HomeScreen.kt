@@ -8,10 +8,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.culturama.data.EventRepository
@@ -34,7 +34,6 @@ import kotlinx.coroutines.launch
 fun HomeScreen(navController: NavController) {
     val scrollState    = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
-    val density        = LocalDensity.current
     val authService    = remember { SupabaseAuthService.instance }
     val favoritos      = remember { RemoteFavoriteRepository.instance }
     val isLoggedIn by authService.isLoggedIn.collectAsState(initial = false)
@@ -112,15 +111,15 @@ fun HomeScreen(navController: NavController) {
             }
 
             // ═══════════════════════════════════════════════════════════════
-            // SEÇÃO 2 — Eventos da semana
+            // SEÇÃO 2 — Eventos da semana (transição limpa + carrossel)
             // ═══════════════════════════════════════════════════════════════
-            Spacer(Modifier.height(0.dp))
-
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .offset(y = (-4).dp)
+                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                     .background(Color(0xFFF5F0EB))
-                    .padding(top = 32.dp, bottom = 32.dp)
+                    .padding(top = 20.dp, bottom = 28.dp)
             ) {
                 WeekEventsSection(
                     events        = events,
@@ -134,7 +133,7 @@ fun HomeScreen(navController: NavController) {
                         }
                     },
                     onEventClick  = { event -> selectedEvent = event },
-                    onSeeAll      = { /* TODO: Navegar para lista completa na próxima etapa */ },
+                    onSeeAll      = { navController.navigate(Screen.Events.createRoute()) },
                     isLoading     = isLoading,
                     errorMessage  = eventsError,
                     onRetry       = { reloadKey++ }
