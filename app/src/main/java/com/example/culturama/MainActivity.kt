@@ -1,22 +1,26 @@
 package com.example.culturama
 
+import android.content.Context
 import android.os.Bundle
-import org.osmdroid.config.Configuration
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import com.example.culturama.navigation.CulturamaNavGraph
 import com.example.culturama.ui.theme.CulturamaTheme
+import org.osmdroid.config.Configuration
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // User-Agent identificável: obrigatório para baixar tiles (OSM/CARTO).
+        // Sem isso o mapa fica em branco ou com tiles de erro.
+        val prefs = getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
         Configuration.getInstance().apply {
-            userAgentValue = packageName
-            osmdroidBasePath = cacheDir
+            load(applicationContext, prefs)
+            userAgentValue = "CulturamaAndroid/${BuildConfig.VERSION_NAME} (${packageName})"
+            osmdroidBasePath = cacheDir.resolve("osmdroid").also { it.mkdirs() }
+            osmdroidTileCache = cacheDir.resolve("osmdroid/tiles").also { it.mkdirs() }
         }
         enableEdgeToEdge()
         setContent {

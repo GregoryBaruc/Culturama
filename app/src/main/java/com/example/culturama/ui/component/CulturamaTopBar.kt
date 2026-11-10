@@ -18,7 +18,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.culturama.ui.theme.*
@@ -47,6 +46,7 @@ fun CulturamaTopBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .statusBarsPadding()
             .background(Color.Transparent)
     ) {
         // ── Barra principal ───────────────────────────────────────────────
@@ -57,15 +57,7 @@ fun CulturamaTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Logo textual
-            Text(
-                text = "Culturama",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Black,
-                    fontSize   = 22.sp,
-                    color      = CulturamaOrange
-                )
-            )
+            CulturamaLogo(height = 28.dp)
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,

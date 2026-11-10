@@ -4,7 +4,12 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,12 +19,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -31,7 +38,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -48,11 +61,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -63,13 +77,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.ContextCompat
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.example.culturama.data.auth.SupabaseAuthService
+import com.example.culturama.data.favorite.RemoteFavoriteRepository
+import com.example.culturama.data.favorite.idDoUsuarioAutenticado
 import com.example.culturama.data.map.Coordenada
 import com.example.culturama.data.map.FiltroDoMapa
 import com.example.culturama.data.map.LocalizacaoAtual
@@ -80,9 +97,8 @@ import com.example.culturama.data.map.distanciaEmKm
 import com.example.culturama.data.map.eventoCoordenada
 import com.example.culturama.data.map.filtrarParaOMapa
 import com.example.culturama.data.map.textoDistancia
-import kotlinx.coroutines.launch
-import org.osmdroid.util.GeoPoint
 import com.example.culturama.model.EventModel
+import com.example.culturama.ui.component.CulturamaLogo
 import com.example.culturama.ui.component.EventCover
 import com.example.culturama.ui.map.CulturamaMapView
 import com.example.culturama.ui.theme.CulturamaBackground
@@ -92,16 +108,26 @@ import com.example.culturama.ui.theme.CulturamaSurface
 import com.example.culturama.ui.theme.TextPrimary
 import com.example.culturama.ui.theme.TextSecondary
 import com.example.culturama.ui.theme.TextTertiary
+import kotlinx.coroutines.launch
+import org.osmdroid.util.GeoPoint
 import java.util.Calendar
 import java.util.TimeZone
 
-private val raiosKm = listOf(null to "Qualquer distância", 5 to "Até 5 km", 10 to "Até 10 km", 25 to "Até 25 km", 50 to "Até 50 km")
+private val raiosKm = listOf(
+    null to "Qualquer distância",
+    5 to "Até 5 km",
+    10 to "Até 10 km",
+    25 to "Até 25 km",
+    50 to "Até 50 km"
+)
 private val filtrosRapidos = listOf("Todos", "Hoje", "Fim de semana", "Grátis")
 private val categoriasDoMapa = listOf(
     "Música", "Samba", "Esportes", "Geek e Games", "Dança", "Artes Cênicas",
     "Arte e Exposição", "Feiras e Gastronomia", "Cultura Popular", "Oficinas", "Outros"
 )
-private val mesesMapa = listOf("JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ")
+private val mesesMapa = listOf(
+    "JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"
+)
 
 data class MapaUiState(
     val userLocation: Coordenada? = null,
@@ -121,7 +147,6 @@ fun MapaEventosScreen(
     val escopo = rememberCoroutineScope()
     var selecionado by remember { mutableStateOf<EventModel?>(null) }
     var foco by remember { mutableStateOf<Coordenada?>(null) }
-    var proximosExpandido by remember { mutableStateOf(false) }
     var painelAberto by rememberSaveable { mutableStateOf(false) }
     var busca by rememberSaveable { mutableStateOf("") }
     var rapido by rememberSaveable { mutableStateOf("Todos") }
@@ -143,6 +168,11 @@ fun MapaEventosScreen(
     val usuario = usuarioLat.toDoubleOrNull()?.let { lat ->
         usuarioLon.toDoubleOrNull()?.let { lon -> Coordenada(lat, lon) }
     }
+
+    val logado by SupabaseAuthService.instance.isLoggedIn.collectAsState(initial = false)
+    val favoritosRepo = remember { RemoteFavoriteRepository.instance }
+    val tickFavoritos by favoritosRepo.alteracoes.collectAsState()
+    val userId = remember(logado, tickFavoritos) { idDoUsuarioAutenticado() }
 
     fun guardarLocal(ponto: Coordenada) {
         usuarioLat = ponto.latitude.toString()
@@ -235,7 +265,12 @@ fun MapaEventosScreen(
         }
     }
 
-    Box(modifier.fillMaxSize()) {
+    fun selecionarEvento(evento: EventModel) {
+        selecionado = evento
+        eventoCoordenada(evento.latitude, evento.longitude)?.let { foco = it }
+    }
+
+    Box(modifier.fillMaxSize().background(CulturamaBackground)) {
         CulturamaMapView(
             events = comMapa.map { it.first },
             userLocation = usuario,
@@ -252,49 +287,139 @@ fun MapaEventosScreen(
                 cameraLon = centro.longitude.toString()
                 cameraZoom = zoom.toString()
             },
-            onEventSelected = { selecionado = it },
+            onEventSelected = { selecionarEvento(it) },
             modifier = Modifier.fillMaxSize()
         )
 
+        // Camada de UI: logo no topo, eventos colados na base.
         Column(
             Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(CulturamaBackground.copy(alpha = 0.94f), Color.Transparent)
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                CulturamaBackground.copy(alpha = 0.97f),
+                                CulturamaBackground.copy(alpha = 0.78f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            ) {
+                CabecalhoDoMapa(
+                    onMostrarLista = onMostrarLista,
+                    busca = busca,
+                    onBusca = { busca = it },
+                    rapido = rapido,
+                    onRapido = { escolhido ->
+                        rapido = if (escolhido == "Todos") "Todos" else escolhido
+                    },
+                    avancadoAtivo = filtro.avancadoAtivo,
+                    onMaisFiltros = { painelAberto = true },
+                    quantidade = comMapa.size,
+                    semResultado = filtro.temAlgum && comMapa.isEmpty(),
+                    onLimpar = {
+                        busca = ""
+                        rapido = "Todos"
+                        categoria = null
+                        subcategoria = null
+                        diaInicial = null
+                        diaFinal = null
+                        entrada = "Todos"
+                        somenteAcessivel = false
+                        raioKm = null
+                    }
+                )
+                avisoLocal?.let {
+                    Text(
+                        text = it,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                    )
+                }
+            }
+
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                Text(
+                    text = "© OpenStreetMap contributors",
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 10.dp, bottom = 10.dp),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = TextTertiary.copy(alpha = 0.8f),
+                        fontSize = 9.sp
                     )
                 )
-        ) {
-            BarraFiltrosDoMapa(
-                busca = busca,
-                onBusca = { busca = it },
-                rapido = rapido,
-                onRapido = { escolhido ->
-                    rapido = if (escolhido == "Todos") "Todos" else escolhido
+                FloatingActionButton(
+                    onClick = { pertoDeMim() },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 12.dp),
+                    containerColor = CulturamaCard,
+                    contentColor = CulturamaOrange,
+                    shape = CircleShape
+                ) {
+                    if (buscandoLocal) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            color = CulturamaOrange,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(Icons.Filled.Place, contentDescription = "Perto de mim")
+                    }
+                }
+            }
+
+            AnimatedContent(
+                targetState = selecionado,
+                modifier = Modifier.fillMaxWidth(),
+                transitionSpec = {
+                    (fadeIn() + slideInVertically { it / 4 }) togetherWith
+                        (fadeOut() + slideOutVertically { it / 4 })
                 },
-                avancadoAtivo = filtro.avancadoAtivo,
-                onMaisFiltros = { painelAberto = true },
-                quantidade = comMapa.size,
-                semResultado = filtro.temAlgum && comMapa.isEmpty(),
-                onLimpar = {
-                    busca = ""
-                    rapido = "Todos"
-                    categoria = null
-                    subcategoria = null
-                    diaInicial = null
-                    diaFinal = null
-                    entrada = "Todos"
-                    somenteAcessivel = false
-                    raioKm = null
-                },
-                onMostrarLista = onMostrarLista
-            )
-            avisoLocal?.let {
-                Text(
-                    text = it,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
-                )
+                label = "painelInferiorMapa"
+            ) { eventoSel ->
+                if (eventoSel == null) {
+                    PainelProximos(
+                        itens = comMapa,
+                        temLocalizacao = usuario != null,
+                        podeAumentarRaio = usuario != null && raioKm != null && comMapa.isEmpty(),
+                        onAumentarRaio = { aumentarRaio() },
+                        onSelecionar = { selecionarEvento(it) }
+                    )
+                } else {
+                    CardMarcador(
+                        evento = eventoSel,
+                        distanciaKm = comMapa.firstOrNull { it.first.id == eventoSel.id }?.second,
+                        favorito = userId?.let { favoritosRepo.ids(it).contains(eventoSel.id) } == true,
+                        podeFavoritar = userId != null,
+                        onFavorito = {
+                            val uid = userId ?: return@CardMarcador
+                            val atual = favoritosRepo.ids(uid).contains(eventoSel.id)
+                            favoritosRepo.setFavorite(uid, eventoSel.id, !atual)
+                        },
+                        onFechar = {
+                            selecionado = null
+                            foco = null
+                        },
+                        onVer = { navController.navigate("eventDetail?eventId=${eventoSel.id}") },
+                        onRota = {
+                            eventoCoordenada(eventoSel.latitude, eventoSel.longitude)?.let { coord ->
+                                abrirRota(contexto, coord.latitude, coord.longitude, eventoSel.title)
+                            }
+                        }
+                    )
+                }
             }
         }
 
@@ -327,63 +452,150 @@ fun MapaEventosScreen(
                 }
             )
         }
+    }
+}
 
-        FloatingActionButton(
-            onClick = { pertoDeMim() },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 188.dp)
-                .navigationBarsPadding(),
-            containerColor = CulturamaOrange,
-            contentColor = CulturamaBackground,
-            shape = CircleShape
+@Composable
+private fun CabecalhoDoMapa(
+    onMostrarLista: () -> Unit,
+    busca: String,
+    onBusca: (String) -> Unit,
+    rapido: String,
+    onRapido: (String) -> Unit,
+    avancadoAtivo: Boolean,
+    onMaisFiltros: () -> Unit,
+    quantidade: Int,
+    semResultado: Boolean,
+    onLimpar: () -> Unit
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            if (buscandoLocal) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(22.dp),
-                    color = CulturamaBackground,
-                    strokeWidth = 2.dp
+            CulturamaLogo(height = 28.dp)
+            Text(
+                text = "Lista",
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(CulturamaCard.copy(alpha = 0.92f))
+                    .clickable(onClick = onMostrarLista)
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.labelLarge.copy(
+                    color = TextPrimary,
+                    fontWeight = FontWeight.SemiBold
                 )
-            } else {
-                Icon(Icons.Filled.Place, contentDescription = "Perto de mim")
+            )
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                Modifier
+                    .weight(1f)
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(CulturamaCard.copy(alpha = 0.94f))
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Filled.Search,
+                    contentDescription = null,
+                    tint = TextTertiary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Box(Modifier.weight(1f)) {
+                    if (busca.isEmpty()) {
+                        Text(
+                            "Buscar eventos, culturas ou bairros...",
+                            style = MaterialTheme.typography.bodyMedium.copy(color = TextTertiary),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    BasicTextField(
+                        value = busca,
+                        onValueChange = onBusca,
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary),
+                        cursorBrush = SolidColor(CulturamaOrange),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                if (busca.isNotEmpty()) {
+                    IconButton(onClick = { onBusca("") }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Filled.Clear, contentDescription = "Limpar pesquisa", tint = TextTertiary)
+                    }
+                }
+            }
+            IconButton(
+                onClick = onMaisFiltros,
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .border(
+                        1.5.dp,
+                        if (avancadoAtivo) CulturamaOrange else CulturamaOrange.copy(alpha = 0.55f),
+                        RoundedCornerShape(14.dp)
+                    )
+                    .background(CulturamaCard.copy(alpha = 0.94f))
+            ) {
+                Icon(
+                    Icons.Filled.Settings,
+                    contentDescription = "Mais filtros",
+                    tint = if (avancadoAtivo) CulturamaOrange else TextSecondary
+                )
             }
         }
 
-        Column(
+        Row(
             Modifier
-                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .navigationBarsPadding()
-                .animateContentSize()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            selecionado?.let { evento ->
-                CardMarcador(
-                    evento = evento,
-                    distanciaKm = comMapa.firstOrNull { it.first.id == evento.id }?.second,
-                    onFechar = { selecionado = null },
-                    onVer = { navController.navigate("eventDetail?eventId=${evento.id}") },
-                    onRota = {
-                        eventoCoordenada(evento.latitude, evento.longitude)?.let { coord ->
-                            abrirRota(contexto, coord.latitude, coord.longitude, evento.title)
-                        }
-                    }
+            filtrosRapidos.forEach { rotulo ->
+                ChipDoMapa(rotulo, selecionado = rapido == rotulo, onClick = { onRapido(rotulo) })
+            }
+            ChipDoMapa("Mais filtros", selecionado = avancadoAtivo, onClick = onMaisFiltros)
+        }
+
+        if (semResultado) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "Nenhum evento encontrado com esses filtros.",
+                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    "Limpar filtros",
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(onClick = onLimpar)
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        color = CulturamaOrange,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 )
             }
-
-            PainelProximos(
-                expandido = proximosExpandido,
-                onExpandir = { proximosExpandido = !proximosExpandido },
-                itens = comMapa,
-                temLocalizacao = usuario != null,
-                podeAumentarRaio = usuario != null && raioKm != null && comMapa.isEmpty(),
-                onAumentarRaio = { aumentarRaio() },
-                onSelecionar = { evento ->
-                    selecionado = evento
-                    eventoCoordenada(evento.latitude, evento.longitude)?.let { foco = it }
-                },
-                onVerDetalhe = { evento ->
-                    navController.navigate("eventDetail?eventId=${evento.id}")
-                }
+        } else {
+            Text(
+                if (quantidade == 1) "1 evento no mapa" else "$quantidade eventos no mapa",
+                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
             )
         }
     }
@@ -393,25 +605,29 @@ fun MapaEventosScreen(
 private fun CardMarcador(
     evento: EventModel,
     distanciaKm: Double?,
+    favorito: Boolean,
+    podeFavoritar: Boolean,
+    onFavorito: () -> Unit,
     onFechar: () -> Unit,
     onVer: () -> Unit,
     onRota: () -> Unit
 ) {
     Column(
         Modifier
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(20.dp))
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
             .background(CulturamaCard)
-            .padding(14.dp)
     ) {
-        Row(verticalAlignment = Alignment.Top) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(148.dp)
+        ) {
             if (!evento.imageUrl.isNullOrBlank()) {
                 AsyncImage(
                     model = evento.imageUrl,
                     contentDescription = evento.title,
-                    modifier = Modifier
-                        .size(72.dp)
-                        .clip(RoundedCornerShape(14.dp)),
+                    modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
             } else {
@@ -420,74 +636,154 @@ private fun CardMarcador(
                     label = evento.title,
                     emoji = eventsScreenEmoji(evento.category),
                     gradient = eventsScreenGradient(evento.category),
-                    modifier = Modifier.size(72.dp)
+                    modifier = Modifier.fillMaxSize()
                 )
             }
-            Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, CulturamaCard.copy(alpha = 0.55f)),
+                            startY = 40f
+                        )
+                    )
+            )
+            IconButton(
+                onClick = onFechar,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp)
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.45f))
+            ) {
+                Icon(Icons.Filled.Close, contentDescription = "Fechar", tint = Color.White, modifier = Modifier.size(18.dp))
+            }
+            if (podeFavoritar) {
+                IconButton(
+                    onClick = onFavorito,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.45f))
+                ) {
+                    Icon(
+                        imageVector = if (favorito) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                        contentDescription = if (favorito) "Remover dos favoritos" else "Favoritar",
+                        tint = if (favorito) CulturamaOrange else Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Text(
+                evento.title,
+                style = MaterialTheme.typography.titleLarge.copy(
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp
+                ),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .border(1.dp, CulturamaOrange.copy(alpha = 0.7f), RoundedCornerShape(999.dp))
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    evento.title,
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        color = TextPrimary,
+                    evento.category.ifBlank { "Cultura" },
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        color = CulturamaOrange,
                         fontWeight = FontWeight.SemiBold
                     ),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    maxLines = 1
                 )
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Filled.DateRange, null, tint = TextSecondary, modifier = Modifier.size(16.dp))
                 Text(
-                    "${evento.category} · ${evento.dayOfMonth} ${evento.monthAbbr} · ${evento.time}",
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                    "${evento.dayOfWeek.take(3)}, ${evento.dayOfMonth} de ${evento.monthAbbr.lowercase()} · ${evento.time}",
+                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
+            }
+            Spacer(Modifier.height(6.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Outlined.Place, null, tint = TextSecondary, modifier = Modifier.size(16.dp))
                 Text(
-                    evento.venueName,
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextTertiary),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    bairroOuCidade(evento.venueName) ?: evento.venueName,
+                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
                 distanciaKm?.let {
                     Text(
                         textoDistancia(it),
-                        style = MaterialTheme.typography.labelLarge.copy(color = CulturamaOrange)
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(CulturamaBackground)
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall.copy(color = CulturamaOrange)
                     )
                 }
             }
-            IconButton(onClick = onFechar, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Filled.Close, contentDescription = "Fechar", tint = TextSecondary)
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = onVer,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = CulturamaOrange,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.weight(1f).height(48.dp)
+                ) { Text("Ver evento", fontWeight = FontWeight.SemiBold) }
+                OutlinedButton(
+                    onClick = onRota,
+                    enabled = evento.temCoordenadas,
+                    shape = RoundedCornerShape(14.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.5.dp, CulturamaOrange),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = CulturamaOrange),
+                    modifier = Modifier.weight(1f).height(48.dp)
+                ) { Text("Como chegar", fontWeight = FontWeight.SemiBold) }
             }
-        }
-        Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = onVer,
-                colors = ButtonDefaults.buttonColors(containerColor = CulturamaOrange),
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.weight(1f)
-            ) { Text("Ver evento") }
-            OutlinedButton(
-                onClick = onRota,
-                enabled = evento.temCoordenadas,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.weight(1f)
-            ) { Text("Como chegar") }
         }
     }
 }
 
 @Composable
 private fun PainelProximos(
-    expandido: Boolean,
-    onExpandir: () -> Unit,
     itens: List<Pair<EventModel, Double?>>,
     temLocalizacao: Boolean,
     podeAumentarRaio: Boolean,
     onAumentarRaio: () -> Unit,
-    onSelecionar: (EventModel) -> Unit,
-    onVerDetalhe: (EventModel) -> Unit
+    onSelecionar: (EventModel) -> Unit
 ) {
     Column(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
             .background(CulturamaCard)
-            .padding(top = 8.dp, bottom = 12.dp)
+            .padding(top = 8.dp, bottom = 14.dp)
     ) {
         Box(
             Modifier
@@ -496,15 +792,28 @@ private fun PainelProximos(
                 .height(4.dp)
                 .clip(RoundedCornerShape(999.dp))
                 .background(TextTertiary.copy(alpha = 0.5f))
-                .clickable(onClick = onExpandir)
         )
-        Text(
-            text = "Eventos perto de você",
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .clickable(onClick = onExpandir),
-            style = MaterialTheme.typography.titleSmall.copy(color = TextPrimary, fontWeight = FontWeight.SemiBold)
-        )
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(Icons.Outlined.Place, null, tint = CulturamaOrange, modifier = Modifier.size(18.dp))
+                Text(
+                    text = if (temLocalizacao) "Eventos perto de você" else "Explore eventos",
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        color = TextPrimary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                )
+            }
+        }
         if (itens.isEmpty()) {
             Text(
                 text = when {
@@ -523,172 +832,70 @@ private fun PainelProximos(
                         .clip(RoundedCornerShape(12.dp))
                         .clickable(onClick = onAumentarRaio)
                         .padding(horizontal = 4.dp, vertical = 6.dp),
-                    style = MaterialTheme.typography.labelLarge.copy(color = CulturamaOrange, fontWeight = FontWeight.SemiBold)
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        color = CulturamaOrange,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 )
             }
         } else {
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.height(if (expandido) 248.dp else 196.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(itens, key = { it.first.id }) { (evento, distancia) ->
                     Column(
                         Modifier
-                            .width(168.dp)
+                            .width(148.dp)
                             .clip(RoundedCornerShape(16.dp))
                             .background(CulturamaBackground)
                             .clickable { onSelecionar(evento) }
-                            .padding(10.dp)
                     ) {
-                        EventCover(
-                            imageUrl = evento.imageUrl,
-                            label = evento.title,
-                            emoji = eventsScreenEmoji(evento.category),
-                            gradient = eventsScreenGradient(evento.category),
-                            modifier = Modifier
+                        Box(
+                            Modifier
                                 .fillMaxWidth()
-                                .height(64.dp)
-                        )
-                        Text(
-                            evento.title,
-                            style = MaterialTheme.typography.labelMedium.copy(color = TextPrimary),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 6.dp)
-                        )
-                        Text(
-                            evento.category,
-                            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-                            maxLines = 1
-                        )
-                        Text(
-                            "${evento.dayOfMonth} ${evento.monthAbbr} · ${evento.time}",
-                            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-                            maxLines = 1
-                        )
-                        Text(
-                            bairroOuCidade(evento.venueName) ?: evento.venueName,
-                            style = MaterialTheme.typography.bodySmall.copy(color = TextTertiary),
-                            maxLines = 1
-                        )
-                        distancia?.let {
+                                .height(96.dp)
+                        ) {
+                            EventCover(
+                                imageUrl = evento.imageUrl,
+                                label = evento.title,
+                                emoji = eventsScreenEmoji(evento.category),
+                                gradient = eventsScreenGradient(evento.category),
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            distancia?.let {
+                                Text(
+                                    textoDistancia(it),
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .padding(8.dp)
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(Color.Black.copy(alpha = 0.62f))
+                                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                                    style = MaterialTheme.typography.labelSmall.copy(color = Color.White)
+                                )
+                            }
+                        }
+                        Column(Modifier.padding(10.dp)) {
                             Text(
-                                textoDistancia(it),
-                                style = MaterialTheme.typography.labelSmall.copy(color = CulturamaOrange)
+                                evento.title,
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    color = TextPrimary,
+                                    fontWeight = FontWeight.SemiBold
+                                ),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                evento.category,
+                                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
-                        Text(
-                            "Ver detalhes",
-                            modifier = Modifier
-                                .padding(top = 4.dp)
-                                .clickable { onVerDetalhe(evento) },
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                color = CulturamaOrange,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        )
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun BarraFiltrosDoMapa(
-    busca: String,
-    onBusca: (String) -> Unit,
-    rapido: String,
-    onRapido: (String) -> Unit,
-    avancadoAtivo: Boolean,
-    onMaisFiltros: () -> Unit,
-    quantidade: Int,
-    semResultado: Boolean,
-    onLimpar: () -> Unit,
-    onMostrarLista: () -> Unit
-) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(
-                Modifier
-                    .weight(1f)
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(CulturamaCard)
-                    .padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(Modifier.weight(1f)) {
-                    if (busca.isEmpty()) {
-                        Text(
-                            "Nome, categoria ou local",
-                            style = MaterialTheme.typography.bodyMedium.copy(color = TextTertiary),
-                            maxLines = 1
-                        )
-                    }
-                    BasicTextField(
-                        value = busca,
-                        onValueChange = onBusca,
-                        singleLine = true,
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary),
-                        cursorBrush = SolidColor(CulturamaOrange),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                if (busca.isNotEmpty()) {
-                    IconButton(onClick = { onBusca("") }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Filled.Clear, contentDescription = "Limpar pesquisa", tint = TextTertiary)
-                    }
-                }
-            }
-            Text(
-                text = "Lista",
-                modifier = Modifier
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(CulturamaCard)
-                    .clickable(onClick = onMostrarLista)
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
-                style = MaterialTheme.typography.labelLarge.copy(color = TextSecondary, fontWeight = FontWeight.SemiBold)
-            )
-        }
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            filtrosRapidos.forEach { rotulo ->
-                ChipDoMapa(rotulo, selecionado = rapido == rotulo, onClick = { onRapido(rotulo) })
-            }
-            ChipDoMapa("Mais filtros", selecionado = avancadoAtivo, onClick = onMaisFiltros)
-        }
-        if (semResultado) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    "Nenhum evento encontrado com esses filtros.",
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    "Limpar filtros",
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable(onClick = onLimpar)
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                    style = MaterialTheme.typography.labelLarge.copy(color = CulturamaOrange, fontWeight = FontWeight.SemiBold)
-                )
-            }
-        } else {
-            Text(
-                if (quantidade == 1) "1 evento encontrado no mapa" else "$quantidade eventos encontrados no mapa",
-                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
-            )
         }
     }
 }
@@ -703,7 +910,7 @@ private fun ChipDoMapa(rotulo: String, selecionado: Boolean, onClick: () -> Unit
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         style = MaterialTheme.typography.labelLarge.copy(
-            color = if (selecionado) CulturamaBackground else TextSecondary,
+            color = if (selecionado) Color.White else TextSecondary,
             fontWeight = FontWeight.SemiBold
         )
     )
@@ -743,7 +950,10 @@ private fun PainelFiltrosDoMapa(
         ) {
             Text(
                 "Mais filtros",
-                style = MaterialTheme.typography.titleLarge.copy(color = TextPrimary, fontWeight = FontWeight.Bold)
+                style = MaterialTheme.typography.titleLarge.copy(
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold
+                )
             )
             TextoSecao("Categoria")
             LinhaDeOpcoes(categoriasDoMapa, categoria) { categoria = if (categoria == it) null else it }
@@ -833,7 +1043,13 @@ private fun PainelFiltrosDoMapa(
 
 @Composable
 private fun TextoSecao(texto: String) {
-    Text(texto, style = MaterialTheme.typography.labelLarge.copy(color = TextSecondary, fontWeight = FontWeight.SemiBold))
+    Text(
+        texto,
+        style = MaterialTheme.typography.labelLarge.copy(
+            color = TextSecondary,
+            fontWeight = FontWeight.SemiBold
+        )
+    )
 }
 
 @Composable

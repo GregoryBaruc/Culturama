@@ -433,10 +433,9 @@ fun EventsScreen(navController: NavController, abrirNoMapa: Boolean = false) {
         }
 
         if (!isListView) {
+            // O mapa trata status/navigation bars por conta própria — sem padding duplo do Scaffold.
             MapaEventosScreen(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
+                modifier = Modifier.fillMaxSize(),
                 events = events,
                 navController = navController,
                 onMostrarLista = { isListView = true }
