@@ -67,7 +67,8 @@ private enum class SecaoDoMural { INICIO, EVENTOS, COLETIVO, VERIFICACAO, COLABO
 fun MuralDoOrganizadorScreen(
     navController: NavController,
     nomeDaSessao: String?,
-    onVoltar: () -> Unit
+    onVoltar: () -> Unit,
+    comoAdministrador: Boolean = false
 ) {
     var carga by remember { mutableStateOf<CargaDoMural?>(null) }
     var secao by rememberSaveable { mutableStateOf(SecaoDoMural.INICIO.name) }
@@ -124,7 +125,11 @@ fun MuralDoOrganizadorScreen(
                     Text("Carregando o espaço cultural…", color = TextSecondary)
                 }
                 CargaDoMural.SemCadastro -> Text(
-                    "Esta conta não tem uma organização vinculada. O login não cria esse vínculo.",
+                    if (comoAdministrador) {
+                        "Como administrador você já entrou na área. Esta conta ainda não tem organização vinculada; com o vínculo, o mural e a gestão de eventos ficam disponíveis aqui."
+                    } else {
+                        "Esta conta não tem uma organização vinculada. O login não cria esse vínculo."
+                    },
                     color = TextPrimary
                 )
                 is CargaDoMural.Falhou -> Text(estado.mensagem, color = TextPrimary)

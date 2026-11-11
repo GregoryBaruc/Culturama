@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.example.culturama.data.acesso.IntencaoDeAcesso
 import com.example.culturama.data.admin.AcessoAdministrativo
 import com.example.culturama.data.admin.PapelNoPainel
 import com.example.culturama.data.auth.ContaAutenticada
@@ -260,6 +261,22 @@ fun UserMenuScreen(
                     resumo = "Visão geral do que está no ar",
                     onClick = {
                         navController.navigate(Screen.AdminPainel.createRoute(SecaoDoPainel.VISAO))
+                    }
+                )
+                AtalhoDoPerfil(
+                    icone = CulturamaIcons.Groups,
+                    titulo = "Área do organizador",
+                    resumo = "Abrir e usar o espaço cultural como admin",
+                    onClick = {
+                        navController.navigate(Screen.AreaDaConta.createRoute(IntencaoDeAcesso.ORGANIZADOR.id))
+                    }
+                )
+                AtalhoDoPerfil(
+                    icone = Icons.Filled.Star,
+                    titulo = "Área empresarial",
+                    resumo = "Abrir e usar o Insights como admin",
+                    onClick = {
+                        navController.navigate(Screen.AreaDaConta.createRoute(IntencaoDeAcesso.EMPRESA.id))
                     }
                 )
             }

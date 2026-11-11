@@ -62,7 +62,8 @@ internal fun statusRecusado(status: String?): Boolean =
 
 /**
  * Organizador só entra se `organizers` da própria conta estiver verificado ou aprovado.
- * Linha sem essas colunas não autoriza. Admin e moderador não entram por aqui.
+ * Linha sem essas colunas não autoriza. Moderador não entra por aqui;
+ * administrador é liberado depois, em [comPrivilegioDeAdministrador].
  */
 fun interpretarOrganizadores(
     linhas: List<LinhaOrganizador>,
@@ -87,6 +88,16 @@ fun interpretarEmpresas(linhas: List<LinhaEmpresa>): ResultadoDeAcesso {
     if (existentes.all { statusRecusado(it.status) }) return ResultadoDeAcesso.RECUSADO
     return ResultadoDeAcesso.INDETERMINADO
 }
+
+/**
+ * Administrador do painel pode entrar e usar as áreas de organizador e empresa
+ * mesmo sem cadastro próprio nesses papéis. Moderador continua bloqueado.
+ */
+fun comPrivilegioDeAdministrador(
+    resultadoDaConta: ResultadoDeAcesso,
+    administrador: Boolean
+): ResultadoDeAcesso =
+    if (administrador) ResultadoDeAcesso.AUTORIZADO else resultadoDaConta
 
 /**
  * Lê só a linha da sessão em `organizers` e `empresas`.

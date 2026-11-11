@@ -60,4 +60,28 @@ class AcessoDaContaTest {
             interpretarEmpresas(listOf(LinhaEmpresa(id = "1", status = null)))
         )
     }
+
+    @Test
+    fun administradorLiberaOrganizadorEEmpresaSemCadastro() {
+        assertEquals(
+            ResultadoDeAcesso.AUTORIZADO,
+            comPrivilegioDeAdministrador(ResultadoDeAcesso.AUSENTE, administrador = true)
+        )
+        assertEquals(
+            ResultadoDeAcesso.AUTORIZADO,
+            comPrivilegioDeAdministrador(ResultadoDeAcesso.PENDENTE, administrador = true)
+        )
+        assertEquals(
+            ResultadoDeAcesso.AUTORIZADO,
+            comPrivilegioDeAdministrador(ResultadoDeAcesso.RECUSADO, administrador = true)
+        )
+        assertEquals(
+            ResultadoDeAcesso.AUSENTE,
+            comPrivilegioDeAdministrador(ResultadoDeAcesso.AUSENTE, administrador = false)
+        )
+        assertEquals(
+            ResultadoDeAcesso.PENDENTE,
+            comPrivilegioDeAdministrador(ResultadoDeAcesso.PENDENTE, administrador = false)
+        )
+    }
 }

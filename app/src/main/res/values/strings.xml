@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Culturama</string>
+    <string name="splash_tagline">A cultura acontece perto de você.</string>
+    <string name="splash_loading">Preparando sua experiência cultural…</string>
 </resources>

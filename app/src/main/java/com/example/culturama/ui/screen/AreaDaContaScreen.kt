@@ -38,6 +38,9 @@ import androidx.navigation.NavController
 import com.example.culturama.data.acesso.AcessoDaConta
 import com.example.culturama.data.acesso.IntencaoDeAcesso
 import com.example.culturama.data.acesso.ResultadoDeAcesso
+import com.example.culturama.data.acesso.comPrivilegioDeAdministrador
+import com.example.culturama.data.admin.AcessoAdministrativo
+import com.example.culturama.data.admin.PapelNoPainel
 import com.example.culturama.data.auth.SupabaseAuthService
 import com.example.culturama.navigation.Screen
 import com.example.culturama.ui.theme.CulturamaBackground
@@ -48,6 +51,7 @@ import com.example.culturama.ui.theme.TextSecondary
 /**
  * Área pedida depois do login. Não é o painel completo.
  * Sem autorização do servidor, mostra o motivo e as saídas possíveis.
+ * Administrador do painel entra nas áreas de organizador e empresa.
  */
 @Composable
 fun AreaDaContaScreen(
@@ -57,6 +61,7 @@ fun AreaDaContaScreen(
 ) {
     val intencao = IntencaoDeAcesso.porId(tipo)
     var resultado by remember { mutableStateOf<ResultadoDeAcesso?>(null) }
+    var comoAdministrador by remember { mutableStateOf(false) }
 
     LaunchedEffect(tipo) {
         if (authService.contaAtual() == null) {
@@ -66,11 +71,15 @@ fun AreaDaContaScreen(
             }
             return@LaunchedEffect
         }
-        resultado = when (intencao) {
+        val daConta = when (intencao) {
             IntencaoDeAcesso.ORGANIZADOR -> AcessoDaConta.situacaoOrganizador()
             IntencaoDeAcesso.EMPRESA -> AcessoDaConta.situacaoEmpresa()
             else -> ResultadoDeAcesso.AUSENTE
         }
+        val admin = AcessoAdministrativo.verificar()
+            .getOrDefault(PapelNoPainel.NENHUM) == PapelNoPainel.ADMINISTRADOR
+        comoAdministrador = admin && daConta != ResultadoDeAcesso.AUTORIZADO
+        resultado = comPrivilegioDeAdministrador(daConta, administrador = admin)
     }
 
     val titulo = if (intencao == IntencaoDeAcesso.EMPRESA) "Culturama Insights" else "Área do organizador"
@@ -80,6 +89,7 @@ fun AreaDaContaScreen(
         MuralDoOrganizadorScreen(
             navController = navController,
             nomeDaSessao = authService.contaAtual()?.nome,
+            comoAdministrador = comoAdministrador,
             onVoltar = {
                 if (!navController.popBackStack()) {
                     navController.navigate(Screen.Organizers.route) { launchSingleTop = true }
@@ -121,7 +131,7 @@ fun AreaDaContaScreen(
                     CircularProgressIndicator(color = CulturamaOrange)
                     Text("Conferindo a permissão desta conta…", color = TextSecondary)
                 }
-                ResultadoDeAcesso.AUTORIZADO -> TextoAutorizado(intencao)
+                ResultadoDeAcesso.AUTORIZADO -> TextoAutorizado(intencao, comoAdministrador)
                 else -> Text(
                     textoDoBloqueio(intencao, resultado!!),
                     style = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary)
@@ -153,15 +163,24 @@ fun AreaDaContaScreen(
 }
 
 @Composable
-private fun TextoAutorizado(intencao: IntencaoDeAcesso) {
-    val texto = if (intencao == IntencaoDeAcesso.EMPRESA) {
-        "Esta conta está aprovada como empresa. O painel de patrocínio e inteligência cultural entra numa próxima etapa."
-    } else {
-        "Esta conta está autorizada como organizador. O painel de publicação de eventos entra numa próxima etapa."
+private fun TextoAutorizado(intencao: IntencaoDeAcesso, comoAdministrador: Boolean) {
+    val texto = when {
+        comoAdministrador && intencao == IntencaoDeAcesso.EMPRESA ->
+            "Você entrou como administrador. Pode usar a área empresarial desta conta."
+        comoAdministrador ->
+            "Você entrou como administrador. Pode usar a área de organizador desta conta."
+        intencao == IntencaoDeAcesso.EMPRESA ->
+            "Esta conta está aprovada como empresa. O painel de patrocínio e inteligência cultural entra numa próxima etapa."
+        else ->
+            "Esta conta está autorizada como organizador. O painel de publicação de eventos entra numa próxima etapa."
     }
     Text(texto, style = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary))
     Text(
-        "Nenhum dado de gestão é carregado aqui.",
+        if (comoAdministrador) {
+            "O acesso vem do papel de administrador, não de um cadastro próprio neste caminho."
+        } else {
+            "Nenhum dado de gestão é carregado aqui."
+        },
         style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary)
     )
 }
