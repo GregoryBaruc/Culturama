@@ -14,6 +14,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +27,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.rememberCoroutineScope
@@ -32,8 +36,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.util.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -48,6 +55,7 @@ import com.example.culturama.data.map.Coordenada
 import com.example.culturama.data.map.LocalizacaoAtual
 import com.example.culturama.data.map.distanciaEmKm
 import kotlinx.coroutines.launch
+import kotlin.math.absoluteValue
 import com.example.culturama.data.auth.SupabaseAuthService
 import com.example.culturama.data.favorite.RemoteFavoriteRepository
 import com.example.culturama.data.favorite.idDoUsuarioAutenticado
@@ -414,6 +422,19 @@ fun EventsScreen(navController: NavController, abrirNoMapa: Boolean = false) {
         }
     }
 
+    val destaques = remember(events) {
+        events.filter { !it.imageUrl.isNullOrBlank() }.distinctBy { it.id }.take(8)
+    }
+
+    fun alternarFavorito(id: String) {
+        val userId = idDoUsuarioAutenticado()
+        if (!isLoggedIn || userId == null) {
+            navController.navigate(Screen.Login.route)
+        } else {
+            favoritedIds = favoritos.setFavorite(userId, id, id !in favoritedIds).toSet()
+        }
+    }
+
     Scaffold(containerColor = CulturamaBackground) { innerPadding ->
         val topoComum: @Composable () -> Unit = {
             EventsHeader(
@@ -458,6 +479,28 @@ fun EventsScreen(navController: NavController, abrirNoMapa: Boolean = false) {
                     onCategorySelect = { cat ->
                         selectedCategory = if (selectedCategory == cat) null else cat
                     }
+                )
+            }
+
+            if (destaques.isNotEmpty()) {
+                item(key = "carrossel") {
+                    CarrosselDeDestaque(
+                        eventos = destaques,
+                        favoritos = favoritedIds,
+                        onFavorite = ::alternarFavorito,
+                        onClick = { navController.navigate("eventDetail?eventId=${it.id}") }
+                    )
+                }
+            }
+
+            item(key = "titulo-lista") {
+                Text(
+                    text = "Mais eventos para você",
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 2.dp),
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
                 )
             }
 
@@ -548,16 +591,7 @@ fun EventsScreen(navController: NavController, abrirNoMapa: Boolean = false) {
                     EventCard(
                         event       = event,
                         isFavorited = event.id in favoritedIds,
-                        onFavorite  = {
-                            val userId = idDoUsuarioAutenticado()
-                            if (!isLoggedIn || userId == null) {
-                                navController.navigate(Screen.Login.route)
-                            } else {
-                                favoritedIds = favoritos
-                                    .setFavorite(userId, event.id, event.id !in favoritedIds)
-                                    .toSet()
-                            }
-                        },
+                        onFavorite  = { alternarFavorito(event.id) },
                         onClick      = { navController.navigate("eventDetail?eventId=${event.id}") },
                         modifier     = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                         imageContent = {
@@ -1329,6 +1363,133 @@ private fun CategoryPill(
             textAlign = TextAlign.Center,
             modifier  = Modifier.widthIn(max = 70.dp)
         )
+    }
+}
+
+@Composable
+private fun CarrosselDeDestaque(
+    eventos: List<EventModel>,
+    favoritos: Set<String>,
+    onFavorite: (String) -> Unit,
+    onClick: (EventModel) -> Unit
+) {
+    val pagerState = rememberPagerState(pageCount = { eventos.size })
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp)) {
+        Text(
+            text = "Em destaque",
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.titleMedium.copy(
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold
+            )
+        )
+        HorizontalPager(
+            state = pagerState,
+            contentPadding = PaddingValues(horizontal = if (eventos.size == 1) 28.dp else 52.dp),
+            pageSpacing = 12.dp,
+            beyondViewportPageCount = 1,
+            modifier = Modifier.fillMaxWidth().height(300.dp)
+        ) { pagina ->
+            val evento = eventos[pagina]
+            val distancia = ((pagerState.currentPage - pagina) + pagerState.currentPageOffsetFraction)
+                .absoluteValue
+                .coerceIn(0f, 1f)
+            val emFoco = distancia < 0.5f
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        val escala = lerp(1f, 0.86f, distancia)
+                        scaleX = escala
+                        scaleY = escala
+                        alpha = lerp(1f, 0.45f, distancia)
+                    }
+                    .clip(RoundedCornerShape(18.dp))
+                    .border(
+                        width = if (emFoco) 2.dp else 0.dp,
+                        color = if (emFoco) CulturamaOrange else Color.Transparent,
+                        shape = RoundedCornerShape(18.dp)
+                    )
+                    .clickable { onClick(evento) }
+            ) {
+                EventCover(
+                    imageUrl = evento.imageUrl,
+                    label = evento.title,
+                    emoji = eventsScreenEmoji(evento.category),
+                    gradient = eventsScreenGradient(evento.category),
+                    modifier = Modifier.fillMaxSize()
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.82f))
+                            )
+                        )
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                ) {
+                    Column {
+                        Text(
+                            text = evento.title,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                        Text(
+                            text = listOf(
+                                evento.category,
+                                "${evento.dayOfMonth} ${evento.monthAbbr}",
+                                evento.venueName
+                            ).filter { it.isNotBlank() }.joinToString(" · "),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.labelSmall.copy(color = Color.White.copy(alpha = 0.85f))
+                        )
+                    }
+                }
+                IconButton(
+                    onClick = { onFavorite(evento.id) },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.45f))
+                ) {
+                    Icon(
+                        imageVector = if (evento.id in favoritos) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                        contentDescription = if (evento.id in favoritos) "Remover dos favoritos" else "Favoritar",
+                        tint = if (evento.id in favoritos) FavoriteActive else Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+        if (eventos.size > 1) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                repeat(eventos.size) { indice ->
+                    val ativo = pagerState.currentPage == indice
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 3.dp)
+                            .size(if (ativo) 8.dp else 6.dp)
+                            .clip(CircleShape)
+                            .background(if (ativo) CulturamaOrange else TextTertiary.copy(alpha = 0.7f))
+                    )
+                }
+            }
+        }
     }
 }
 
