@@ -1,14 +1,11 @@
 package com.example.culturama.ui.map
 
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.RectF
-import android.graphics.Typeface
-import android.graphics.drawable.BitmapDrawable
-import android.graphics.drawable.Drawable
+import android.graphics.Point
 import android.graphics.drawable.GradientDrawable
+import android.os.Handler
+import android.os.Looper
+import android.view.View
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -19,6 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.culturama.data.map.Coordenada
 import com.example.culturama.model.EventModel
+import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
 import org.osmdroid.events.ZoomEvent
@@ -26,9 +24,25 @@ import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 
 private const val MARCADOR_USUARIO = "usuario"
+private const val PREFIXO_EVENTO = "evt:"
+private const val LIMITE_DENSO = 90
+private const val CARGA_NORMAL = 42
+private const val CARGA_DENSA = 18
+
+private class PonteDoMapa {
+    var onCamera: (GeoPoint, Double) -> Unit = { _, _ -> }
+    var onEventSelected: (EventModel) -> Unit = {}
+    var onToqueNoMapa: () -> Unit = {}
+    var onAncora: (PosicaoDoMarcador?) -> Unit = {}
+    var eventos: List<EventModel> = emptyList()
+    var selecionadoId: String? = null
+    var localUsuario: Coordenada? = null
+    var ignorarToqueMapaAte: Long = 0
+}
 
 @Composable
 fun CulturamaMapView(
@@ -41,9 +55,24 @@ fun CulturamaMapView(
     zoomInicial: Double,
     onCamera: (GeoPoint, Double) -> Unit,
     onEventSelected: (EventModel) -> Unit,
+    onToqueNoMapa: () -> Unit,
+    onAncora: (PosicaoDoMarcador?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val contexto = LocalContext.current
+    val ponte = remember { PonteDoMapa() }
+    ponte.onCamera = onCamera
+    ponte.onEventSelected = onEventSelected
+    ponte.onToqueNoMapa = onToqueNoMapa
+    ponte.onAncora = onAncora
+    ponte.eventos = events
+    ponte.selecionadoId = selectedEventId
+    ponte.localUsuario = userLocation
+
+    val cache = remember { FilaDeMiniaturas(contexto) }
+    val assinaturas = remember { HashMap<String, String>() }
+    val handler = remember { Handler(Looper.getMainLooper()) }
+    val density = contexto.resources.displayMetrics.density
     val mapa = remember {
         MapView(contexto).apply {
             setTileSource(TileSourceFactory.MAPNIK)
@@ -53,26 +82,56 @@ fun CulturamaMapView(
             controller.setZoom(zoomInicial)
             controller.setCenter(centroInicial)
             isTilesScaledToDpi = true
-            // Esconde os botões +/- nativos (faixa preta na lateral).
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
+            overlays.add(
+                MapEventsOverlay(object : MapEventsReceiver {
+                    override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
+                        if (android.os.SystemClock.uptimeMillis() < ponte.ignorarToqueMapaAte) return true
+                        ponte.onToqueNoMapa()
+                        return true
+                    }
+
+                    override fun longPressHelper(p: GeoPoint): Boolean = false
+                })
+            )
         }
+    }
+    val nucleo = remember(mapa) {
+        MarcadoresNoMapa(mapa, ponte, cache, assinaturas, handler, density)
     }
 
     DisposableEffect(Unit) {
         val ouvinte = object : MapListener {
             override fun onScroll(event: ScrollEvent?): Boolean {
-                onCamera(GeoPoint(mapa.mapCenter), mapa.zoomLevelDouble)
+                ponte.onCamera(GeoPoint(mapa.mapCenter), mapa.zoomLevelDouble)
+                nucleo.publicarAncora()
+                nucleo.agendarCarga()
                 return false
             }
+
             override fun onZoom(event: ZoomEvent?): Boolean {
-                onCamera(GeoPoint(mapa.mapCenter), mapa.zoomLevelDouble)
+                ponte.onCamera(GeoPoint(mapa.mapCenter), mapa.zoomLevelDouble)
+                nucleo.publicarAncora()
+                nucleo.agendarCarga()
                 return false
             }
         }
+        val layout = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            nucleo.publicarAncora()
+            nucleo.agendarCarga()
+        }
         mapa.addMapListener(ouvinte)
+        mapa.addOnLayoutChangeListener(layout)
         mapa.onResume()
         onDispose {
+            handler.removeCallbacksAndMessages(null)
+            cache.encerrar()
+            ponte.onAncora = {}
+            ponte.onToqueNoMapa = {}
+            ponte.onCamera = { _, _ -> }
+            ponte.onEventSelected = {}
             mapa.removeMapListener(ouvinte)
+            mapa.removeOnLayoutChangeListener(layout)
             mapa.onPause()
             mapa.onDetach()
         }
@@ -92,26 +151,12 @@ fun CulturamaMapView(
         }
     }
 
-    LaunchedEffect(events, selectedEventId, userLocation) {
-        val comCoordenada = events.filter { it.temCoordenadas }
-        mapa.overlays.removeAll { it is Marker && it.relatedObject != MARCADOR_USUARIO }
-        comCoordenada.forEach { evento ->
-            val destaque = evento.id == selectedEventId
-            val marcador = Marker(mapa).apply {
-                position = GeoPoint(evento.latitude!!, evento.longitude!!)
-                title = evento.title
-                snippet = evento.venueName
-                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                icon = pinCategoria(contexto.resources.displayMetrics.density, evento.category, destaque)
-                setOnMarkerClickListener { _, _ ->
-                    onEventSelected(evento)
-                    true
-                }
-            }
-            mapa.overlays.add(marcador)
-        }
-        marcarUsuario(mapa, userLocation)
-        mapa.invalidate()
+    LaunchedEffect(events, selectedEventId) {
+        nucleo.sincronizar()
+    }
+
+    LaunchedEffect(userLocation) {
+        nucleo.atualizarUsuario()
     }
 
     AndroidView(
@@ -121,6 +166,181 @@ fun CulturamaMapView(
     )
 }
 
+private class MarcadoresNoMapa(
+    private val mapa: MapView,
+    private val ponte: PonteDoMapa,
+    private val cache: FilaDeMiniaturas,
+    private val assinaturas: MutableMap<String, String>,
+    private val handler: Handler,
+    private val density: Float
+) {
+    private var tokenCarga = 0
+    private var aguardandoLayout = false
+
+    fun sincronizar() {
+        val eventos = ponte.eventos.filter { it.temCoordenadas }
+        val ids = eventos.map { it.id }.toSet()
+        val denso = eventos.size > LIMITE_DENSO
+        val atuais = HashMap<String, Marker>()
+        mapa.overlays.filterIsInstance<Marker>().forEach { marker ->
+            val bruto = marker.relatedObject as? String ?: return@forEach
+            if (!bruto.startsWith(PREFIXO_EVENTO)) return@forEach
+            val id = bruto.removePrefix(PREFIXO_EVENTO)
+            if (id !in ids) {
+                mapa.overlays.remove(marker)
+                assinaturas.remove(id)
+            } else {
+                atuais[id] = marker
+            }
+        }
+        eventos.forEach { evento ->
+            val selecionado = evento.id == ponte.selecionadoId
+            val url = evento.imageUrl?.takeIf { it.isNotBlank() }
+            val foto = url?.let { cache.pronta(it) }
+            val compacto = denso && !selecionado
+            val assinatura = assinaturaDe(evento, selecionado, compacto, foto != null)
+            val existente = atuais[evento.id]
+            if (existente == null) {
+                val novo = Marker(mapa).apply {
+                    relatedObject = PREFIXO_EVENTO + evento.id
+                    position = GeoPoint(evento.latitude!!, evento.longitude!!)
+                    title = evento.title
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    infoWindow = null
+                    icon = iconeMarcador(density, evento.category, selecionado, compacto, foto)
+                    setOnMarkerClickListener { _, _ ->
+                        ponte.ignorarToqueMapaAte = android.os.SystemClock.uptimeMillis() + 350
+                        ponte.eventos.find { it.id == evento.id }?.let(ponte.onEventSelected)
+                        true
+                    }
+                }
+                mapa.overlays.add(novo)
+                assinaturas[evento.id] = assinatura
+            } else {
+                existente.position = GeoPoint(evento.latitude!!, evento.longitude!!)
+                existente.title = evento.title
+                if (assinaturas[evento.id] != assinatura) {
+                    existente.icon = iconeMarcador(density, evento.category, selecionado, compacto, foto)
+                    assinaturas[evento.id] = assinatura
+                }
+            }
+        }
+        val selId = ponte.selecionadoId
+        if (selId != null) {
+            val sel = mapa.overlays.filterIsInstance<Marker>()
+                .find { it.relatedObject == PREFIXO_EVENTO + selId }
+            if (sel != null) {
+                mapa.overlays.remove(sel)
+                mapa.overlays.add(sel)
+            }
+        }
+        desenharUsuario()
+        mapa.invalidate()
+        publicarAncora()
+        agendarCarga()
+    }
+
+    fun atualizarUsuario() {
+        desenharUsuario()
+        mapa.invalidate()
+    }
+
+    fun aplicarFoto(eventoId: String, url: String, foto: Bitmap) {
+        if (foto.isRecycled) return
+        val evento = ponte.eventos.find { it.id == eventoId } ?: return
+        if (evento.imageUrl != url) return
+        val marker = mapa.overlays.filterIsInstance<Marker>()
+            .find { it.relatedObject == PREFIXO_EVENTO + eventoId } ?: return
+        val selecionado = eventoId == ponte.selecionadoId
+        val denso = ponte.eventos.count { it.temCoordenadas } > LIMITE_DENSO
+        val compacto = denso && !selecionado
+        val assinatura = assinaturaDe(evento, selecionado, compacto, temFoto = true)
+        if (assinaturas[eventoId] == assinatura) return
+        marker.icon = iconeMarcador(density, evento.category, selecionado, compacto, foto)
+        assinaturas[eventoId] = assinatura
+        mapa.invalidate()
+    }
+
+    fun publicarAncora() {
+        if (mapa.width == 0 || mapa.height == 0) {
+            if (!aguardandoLayout) {
+                aguardandoLayout = true
+                mapa.post {
+                    aguardandoLayout = false
+                    if (mapa.width > 0 && mapa.height > 0) publicarAncora()
+                }
+            }
+            return
+        }
+        val evento = ponte.selecionadoId?.let { id ->
+            ponte.eventos.find { it.id == id && it.temCoordenadas }
+        }
+        if (evento == null) {
+            ponte.onAncora(null)
+            return
+        }
+        val ponto = Point()
+        mapa.projection.toPixels(GeoPoint(evento.latitude!!, evento.longitude!!), ponto)
+        ponte.onAncora(
+            PosicaoDoMarcador(
+                x = ponto.x.toFloat(),
+                y = ponto.y.toFloat(),
+                raioPx = raioDoMarcadorSelecionado(density)
+            )
+        )
+    }
+
+    fun agendarCarga() {
+        val token = ++tokenCarga
+        handler.postDelayed({
+            if (token != tokenCarga) return@postDelayed
+            carregarVisiveis()
+        }, 220L)
+    }
+
+    private fun carregarVisiveis() {
+        if (!mapa.isShown || mapa.width == 0) return
+        val eventos = ponte.eventos.filter { it.temCoordenadas && !it.imageUrl.isNullOrBlank() }
+        if (eventos.isEmpty()) return
+        val box = runCatching { mapa.boundingBox }.getOrNull() ?: return
+        val centro = mapa.mapCenter
+        val visiveis = eventos.filter { box.contains(it.latitude!!, it.longitude!!) }
+        val limite = if (visiveis.size > LIMITE_DENSO) CARGA_DENSA else CARGA_NORMAL
+        val ordenados = visiveis.sortedBy { evento ->
+            val dLat = evento.latitude!! - centro.latitude
+            val dLon = evento.longitude!! - centro.longitude
+            dLat * dLat + dLon * dLon
+        }
+        val escolhidos = ordenados.take(limite).toMutableList()
+        val selecionado = ponte.selecionadoId?.let { id -> eventos.find { it.id == id } }
+        if (selecionado != null && escolhidos.none { it.id == selecionado.id }) {
+            escolhidos.add(0, selecionado)
+        }
+        cache.manterSomente(escolhidos.mapNotNull { it.imageUrl?.takeIf(String::isNotBlank) }.toSet())
+        escolhidos.forEach { evento ->
+            val url = evento.imageUrl?.takeIf(String::isNotBlank) ?: return@forEach
+            cache.pedir(evento.id, url) { bitmap ->
+                if (bitmap != null) {
+                    mapa.post {
+                        if (mapa.isAttachedToWindow) aplicarFoto(evento.id, url, bitmap)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun desenharUsuario() {
+        marcarUsuario(mapa, ponte.localUsuario)
+    }
+}
+
+private fun assinaturaDe(
+    evento: EventModel,
+    selecionado: Boolean,
+    compacto: Boolean,
+    temFoto: Boolean
+): String = "${evento.category}|${evento.imageUrl}|$selecionado|$compacto|$temFoto"
+
 private fun marcarUsuario(mapa: MapView, local: Coordenada?) {
     val existente = mapa.overlays.filterIsInstance<Marker>().find { it.relatedObject == MARCADOR_USUARIO }
     if (local == null) {
@@ -128,105 +348,23 @@ private fun marcarUsuario(mapa: MapView, local: Coordenada?) {
         return
     }
     val ponto = GeoPoint(local.latitude, local.longitude)
-    if (existente == null) {
-        mapa.overlays.add(
-            Marker(mapa).apply {
-                relatedObject = MARCADOR_USUARIO
-                position = ponto
-                title = "Você"
-                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                icon = pontoUsuario()
-                setOnMarkerClickListener { _, _ -> true }
-            }
-        )
-    } else {
-        existente.position = ponto
+    val marker = existente ?: Marker(mapa).apply {
+        relatedObject = MARCADOR_USUARIO
+        title = "Você"
+        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+        icon = pontoUsuario()
+        setOnMarkerClickListener { _, _ -> true }
     }
+    marker.position = ponto
+    if (existente != null) mapa.overlays.remove(marker)
+    mapa.overlays.add(marker)
 }
 
-private fun pontoUsuario(): Drawable {
+private fun pontoUsuario(): GradientDrawable {
     return GradientDrawable().apply {
         shape = GradientDrawable.OVAL
         setColor(0xFFFFFFFF.toInt())
         setSize(28, 28)
         setStroke(6, 0xFFE8835A.toInt())
-    }
-}
-
-/** Cores dos pins por categoria real do app (referência visual do mockup). */
-internal fun corCategoriaMapa(categoria: String): Int {
-    val c = categoria.lowercase()
-    return when {
-        "música" in c || "musica" in c || "samba" in c || "hip" in c || "rap" in c || "sarau" in c -> 0xFFE8835A.toInt()
-        "geek" in c || "game" in c || "jog" in c -> 0xFF9B6BFF.toInt()
-        "feira" in c || "gastro" in c || "comida" in c -> 0xFFF0C040.toInt()
-        "arte" in c || "teatro" in c || "cênic" in c || "cenic" in c || "cinema" in c -> 0xFF4C8DFF.toInt()
-        "grafite" in c || "oficina" in c || "exposição" in c || "exposicao" in c -> 0xFFFF5CA8.toInt()
-        "esporte" in c || "skate" in c || "capoeira" in c || "dança" in c || "danca" in c -> 0xFF3DCC7A.toInt()
-        "cultura" in c || "popular" in c -> 0xFFE85A5A.toInt()
-        else -> 0xFFE8835A.toInt()
-    }
-}
-
-private fun simboloCategoria(categoria: String): String {
-    val c = categoria.lowercase()
-    return when {
-        "música" in c || "musica" in c || "samba" in c || "hip" in c || "rap" in c || "sarau" in c -> "♪"
-        "geek" in c || "game" in c -> "G"
-        "feira" in c || "gastro" in c -> "F"
-        "arte" in c || "teatro" in c || "cênic" in c || "cenic" in c || "cinema" in c -> "A"
-        "grafite" in c || "oficina" in c || "exposição" in c || "exposicao" in c -> "✦"
-        "esporte" in c || "skate" in c || "capoeira" in c -> "E"
-        "dança" in c || "danca" in c -> "D"
-        "cultura" in c || "popular" in c -> "C"
-        else -> "★"
-    }
-}
-
-private fun pinCategoria(density: Float, categoria: String, destaque: Boolean): Drawable {
-    val escala = if (destaque) 1.22f else 1f
-    val w = (36f * density * escala).toInt().coerceAtLeast(36)
-    val h = (46f * density * escala).toInt().coerceAtLeast(46)
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-    val cor = corCategoriaMapa(categoria)
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = cor; style = Paint.Style.FILL }
-    val sombra = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0x66000000
-        style = Paint.Style.FILL
-    }
-    val cx = w / 2f
-    val cy = h * 0.38f
-    val raio = w * 0.32f
-    // sombra suave
-    canvas.drawOval(RectF(cx - raio * 0.7f, h - raio * 0.55f, cx + raio * 0.7f, h.toFloat()), sombra)
-    // gota
-    val path = Path().apply {
-        moveTo(cx, h - density * 2f)
-        quadTo(cx + raio * 1.15f, cy + raio * 0.55f, cx + raio, cy)
-        arcTo(RectF(cx - raio, cy - raio, cx + raio, cy + raio), 0f, -180f, false)
-        quadTo(cx - raio * 1.15f, cy + raio * 0.55f, cx, h - density * 2f)
-        close()
-    }
-    canvas.drawPath(path, paint)
-    if (destaque) {
-        val borda = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFFFFFFFF.toInt()
-            style = Paint.Style.STROKE
-            strokeWidth = 2.5f * density
-        }
-        canvas.drawPath(path, borda)
-    }
-    val texto = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFFFFFFFF.toInt()
-        textAlign = Paint.Align.CENTER
-        textSize = raio * 0.95f
-        typeface = Typeface.DEFAULT_BOLD
-    }
-    val simbolo = simboloCategoria(categoria)
-    val textY = cy - (texto.descent() + texto.ascent()) / 2f
-    canvas.drawText(simbolo, cx, textY, texto)
-    return BitmapDrawable(null, bitmap).apply {
-        setBounds(0, 0, w, h)
     }
 }

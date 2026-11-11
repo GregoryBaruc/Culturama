@@ -41,17 +41,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.example.culturama.model.EventModel
-import com.example.culturama.ui.component.EventImagePlaceholder
+import com.example.culturama.ui.component.CapaAdaptativa
 import com.example.culturama.ui.component.PlaceholderBatalha
 import com.example.culturama.ui.component.PlaceholderCapoeira
 import com.example.culturama.ui.component.PlaceholderFeira
@@ -325,7 +322,8 @@ private fun WeekEventCarouselCard(
 }
 
 /**
- * Cartaz: Fit para não cortar informação; fundo complementar preenche laterais.
+ * Cartaz inteiro no retângulo fixo. As laterais usam a própria imagem suavizada,
+ * velada na cor do card, em vez de uma faixa lisa.
  */
 @Composable
 private fun EventPosterImage(
@@ -334,33 +332,16 @@ private fun EventPosterImage(
     category: String,
     modifier: Modifier = Modifier
 ) {
-    val emoji = eventEmoji(category)
-    val gradient = eventGradient(category)
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        EventImagePlaceholder(
-            label = title.take(18),
-            emoji = emoji,
-            gradient = gradient,
-            modifier = Modifier.fillMaxSize()
-        )
-        if (!imageUrl.isNullOrBlank()) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(CreamImagePad, Color(0xFFE2D6C8))
-                        )
-                    )
-            )
-            AsyncImage(
-                model = imageUrl,
-                contentDescription = title,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-    }
+    CapaAdaptativa(
+        imageUrl = imageUrl,
+        contentDescription = title,
+        label = title.take(18),
+        emoji = eventEmoji(category),
+        gradient = eventGradient(category),
+        fundo = CreamImagePad,
+        velatura = Color(0x402C1F1A),
+        modifier = modifier
+    )
 }
 
 private fun eventEmoji(category: String): String = when {

@@ -595,10 +595,11 @@ fun EventsScreen(navController: NavController, abrirNoMapa: Boolean = false) {
                         onClick      = { navController.navigate("eventDetail?eventId=${event.id}") },
                         modifier     = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                         imageContent = {
-                            EventCover(
+                            CapaAdaptativa(
                                 imageUrl = event.imageUrl,
-                                label    = event.title,
-                                emoji    = eventsScreenEmoji(event.category),
+                                contentDescription = event.title,
+                                label = event.title,
+                                emoji = eventsScreenEmoji(event.category),
                                 gradient = eventsScreenGradient(event.category)
                             )
                         }
@@ -1412,8 +1413,9 @@ private fun CarrosselDeDestaque(
                     )
                     .clickable { onClick(evento) }
             ) {
-                EventCover(
+                CapaAdaptativa(
                     imageUrl = evento.imageUrl,
+                    contentDescription = evento.title,
                     label = evento.title,
                     emoji = eventsScreenEmoji(evento.category),
                     gradient = eventsScreenGradient(evento.category),

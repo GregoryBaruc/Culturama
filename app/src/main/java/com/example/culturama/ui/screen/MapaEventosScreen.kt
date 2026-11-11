@@ -4,18 +4,19 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -25,7 +26,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -63,6 +68,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,13 +78,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -101,6 +113,10 @@ import com.example.culturama.model.EventModel
 import com.example.culturama.ui.component.CulturamaLogo
 import com.example.culturama.ui.component.EventCover
 import com.example.culturama.ui.map.CulturamaMapView
+import com.example.culturama.ui.map.corCategoriaMapa
+import com.example.culturama.ui.map.corDoSimbolo
+import com.example.culturama.ui.map.letraDoMarcador
+import kotlin.math.roundToInt
 import com.example.culturama.ui.theme.CulturamaBackground
 import com.example.culturama.ui.theme.CulturamaCard
 import com.example.culturama.ui.theme.CulturamaOrange
@@ -128,6 +144,11 @@ private val categoriasDoMapa = listOf(
 private val mesesMapa = listOf(
     "JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"
 )
+
+private class AncoraDoMarcador {
+    var ponto by mutableStateOf<Offset?>(null)
+    var raioPx by mutableFloatStateOf(36f)
+}
 
 data class MapaUiState(
     val userLocation: Coordenada? = null,
@@ -165,6 +186,16 @@ fun MapaEventosScreen(
     var pedidoCentro by remember { mutableIntStateOf(0) }
     var buscandoLocal by remember { mutableStateOf(false) }
     var avisoLocal by remember { mutableStateOf<String?>(null) }
+    val ancora = remember { AncoraDoMarcador() }
+    var alturaCabecalho by remember { mutableIntStateOf(0) }
+    val densidade = LocalDensity.current
+    val reservaDoCabecalho = if (alturaCabecalho == 0) {
+        with(densidade) { 210.dp.roundToPx() }
+    } else {
+        alturaCabecalho
+    }
+    val limiteTopoPx = WindowInsets.statusBars.getTop(densidade) + reservaDoCabecalho +
+        with(densidade) { 8.dp.roundToPx() }
     val usuario = usuarioLat.toDoubleOrNull()?.let { lat ->
         usuarioLon.toDoubleOrNull()?.let { lon -> Coordenada(lat, lon) }
     }
@@ -262,6 +293,8 @@ fun MapaEventosScreen(
     LaunchedEffect(comMapa) {
         if (selecionado != null && comMapa.none { it.first.id == selecionado?.id }) {
             selecionado = null
+            foco = null
+            ancora.ponto = null
         }
     }
 
@@ -288,6 +321,17 @@ fun MapaEventosScreen(
                 cameraZoom = zoom.toString()
             },
             onEventSelected = { selecionarEvento(it) },
+            onToqueNoMapa = {
+                if (selecionado != null) {
+                    selecionado = null
+                    foco = null
+                    ancora.ponto = null
+                }
+            },
+            onAncora = { posicao ->
+                ancora.ponto = posicao?.let { Offset(it.x, it.y) }
+                if (posicao != null) ancora.raioPx = posicao.raioPx
+            },
             modifier = Modifier.fillMaxSize()
         )
 
@@ -301,6 +345,7 @@ fun MapaEventosScreen(
             Column(
                 Modifier
                     .fillMaxWidth()
+                    .onSizeChanged { alturaCabecalho = it.height }
                     .background(
                         Brush.verticalGradient(
                             listOf(
@@ -380,47 +425,47 @@ fun MapaEventosScreen(
                 }
             }
 
-            AnimatedContent(
-                targetState = selecionado,
+            AnimatedVisibility(
+                visible = selecionado == null,
                 modifier = Modifier.fillMaxWidth(),
-                transitionSpec = {
-                    (fadeIn() + slideInVertically { it / 4 }) togetherWith
-                        (fadeOut() + slideOutVertically { it / 4 })
-                },
-                label = "painelInferiorMapa"
-            ) { eventoSel ->
-                if (eventoSel == null) {
-                    PainelProximos(
-                        itens = comMapa,
-                        temLocalizacao = usuario != null,
-                        podeAumentarRaio = usuario != null && raioKm != null && comMapa.isEmpty(),
-                        onAumentarRaio = { aumentarRaio() },
-                        onSelecionar = { selecionarEvento(it) }
-                    )
-                } else {
-                    CardMarcador(
-                        evento = eventoSel,
-                        distanciaKm = comMapa.firstOrNull { it.first.id == eventoSel.id }?.second,
-                        favorito = userId?.let { favoritosRepo.ids(it).contains(eventoSel.id) } == true,
-                        podeFavoritar = userId != null,
-                        onFavorito = {
-                            val uid = userId ?: return@CardMarcador
-                            val atual = favoritosRepo.ids(uid).contains(eventoSel.id)
-                            favoritosRepo.setFavorite(uid, eventoSel.id, !atual)
-                        },
-                        onFechar = {
-                            selecionado = null
-                            foco = null
-                        },
-                        onVer = { navController.navigate("eventDetail?eventId=${eventoSel.id}") },
-                        onRota = {
-                            eventoCoordenada(eventoSel.latitude, eventoSel.longitude)?.let { coord ->
-                                abrirRota(contexto, coord.latitude, coord.longitude, eventoSel.title)
-                            }
-                        }
-                    )
-                }
+                enter = fadeIn() + slideInVertically { it / 4 },
+                exit = fadeOut() + slideOutVertically { it / 4 }
+            ) {
+                PainelProximos(
+                    itens = comMapa,
+                    temLocalizacao = usuario != null,
+                    podeAumentarRaio = usuario != null && raioKm != null && comMapa.isEmpty(),
+                    onAumentarRaio = { aumentarRaio() },
+                    onSelecionar = { selecionarEvento(it) }
+                )
             }
+        }
+
+        selecionado?.let { eventoSel ->
+            CardFlutuanteDoMapa(
+                evento = eventoSel,
+                ancora = ancora,
+                limiteTopoPx = limiteTopoPx,
+                distanciaKm = comMapa.firstOrNull { it.first.id == eventoSel.id }?.second,
+                favorito = userId?.let { favoritosRepo.ids(it).contains(eventoSel.id) } == true,
+                podeFavoritar = userId != null,
+                onFavorito = {
+                    val uid = userId ?: return@CardFlutuanteDoMapa
+                    val atual = favoritosRepo.ids(uid).contains(eventoSel.id)
+                    favoritosRepo.setFavorite(uid, eventoSel.id, !atual)
+                },
+                onFechar = {
+                    selecionado = null
+                    foco = null
+                    ancora.ponto = null
+                },
+                onVer = { navController.navigate("eventDetail?eventId=${eventoSel.id}") },
+                onRota = {
+                    eventoCoordenada(eventoSel.latitude, eventoSel.longitude)?.let { coord ->
+                        abrirRota(contexto, coord.latitude, coord.longitude, eventoSel.title)
+                    }
+                }
+            )
         }
 
         if (painelAberto) {
@@ -602,7 +647,103 @@ private fun CabecalhoDoMapa(
 }
 
 @Composable
-private fun CardMarcador(
+private fun CardFlutuanteDoMapa(
+    evento: EventModel,
+    ancora: AncoraDoMarcador,
+    limiteTopoPx: Int,
+    distanciaKm: Double?,
+    favorito: Boolean,
+    podeFavoritar: Boolean,
+    onFavorito: () -> Unit,
+    onFechar: () -> Unit,
+    onVer: () -> Unit,
+    onRota: () -> Unit
+) {
+    val ponto = ancora.ponto ?: return
+    val density = LocalDensity.current
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val margemPx = with(density) { 12.dp.roundToPx() }
+        val disponivel = maxWidth - 24.dp
+        val largura = when {
+            disponivel <= 0.dp -> 220.dp
+            disponivel < 300.dp -> disponivel
+            else -> 300.dp
+        }
+        val larguraPx = with(density) { largura.roundToPx() }
+        val basePx = constraints.maxHeight - WindowInsets.navigationBars.getBottom(density) - margemPx
+        var alturaPx by remember(evento.id) { mutableIntStateOf(0) }
+        val folga = ancora.raioPx + with(density) { 8.dp.toPx() }
+        val acima = alturaPx == 0 || ponto.y - alturaPx - folga >= limiteTopoPx
+        val foraDaTela = ponto.x < -72f || ponto.y < -72f ||
+            ponto.x > constraints.maxWidth + 72f || ponto.y > constraints.maxHeight + 72f
+        if (foraDaTela) return@BoxWithConstraints
+
+        val maxX = (constraints.maxWidth - larguraPx - margemPx).coerceAtLeast(margemPx)
+        val x = (ponto.x - larguraPx / 2f).roundToInt().coerceIn(margemPx, maxX)
+        val y = if (alturaPx == 0) {
+            -8000
+        } else {
+            val bruto = if (acima) {
+                (ponto.y - alturaPx - folga).roundToInt()
+            } else {
+                (ponto.y + folga).roundToInt()
+            }
+            val maxY = (basePx - alturaPx).coerceAtLeast(limiteTopoPx)
+            bruto.coerceIn(limiteTopoPx, maxY)
+        }
+        val limiteSeta = (larguraPx / 2f - with(density) { 18.dp.toPx() }).coerceAtLeast(0f)
+        val deslocamento = (ponto.x - (x + larguraPx / 2f)).coerceIn(-limiteSeta, limiteSeta)
+
+        Column(
+            Modifier
+                .offset { IntOffset(x, y) }
+                .width(largura)
+                .onSizeChanged { alturaPx = it.height }
+        ) {
+            if (!acima) SetaDoCard(deslocamento, paraCima = true)
+            ConteudoDoCardFlutuante(
+                evento = evento,
+                distanciaKm = distanciaKm,
+                favorito = favorito,
+                podeFavoritar = podeFavoritar,
+                onFavorito = onFavorito,
+                onFechar = onFechar,
+                onVer = onVer,
+                onRota = onRota
+            )
+            if (acima) SetaDoCard(deslocamento, paraCima = false)
+        }
+    }
+}
+
+@Composable
+private fun SetaDoCard(deslocamentoPx: Float, paraCima: Boolean) {
+    Canvas(
+        Modifier
+            .fillMaxWidth()
+            .height(9.dp)
+            .offset(y = if (paraCima) 1.dp else (-1).dp)
+    ) {
+        val ponta = (size.width / 2f + deslocamentoPx).coerceIn(16.dp.toPx(), size.width - 16.dp.toPx())
+        val base = 8.dp.toPx()
+        val caminho = Path().apply {
+            if (paraCima) {
+                moveTo(ponta, 0f)
+                lineTo(ponta - base, size.height)
+                lineTo(ponta + base, size.height)
+            } else {
+                moveTo(ponta - base, 0f)
+                lineTo(ponta + base, 0f)
+                lineTo(ponta, size.height)
+            }
+            close()
+        }
+        drawPath(caminho, CulturamaCard)
+    }
+}
+
+@Composable
+private fun ConteudoDoCardFlutuante(
     evento: EventModel,
     distanciaKm: Double?,
     favorito: Boolean,
@@ -612,17 +753,40 @@ private fun CardMarcador(
     onVer: () -> Unit,
     onRota: () -> Unit
 ) {
+    val local = bairroOuCidade(evento.venueName) ?: evento.venueName.takeIf { it.isNotBlank() }
+    val entrada = when {
+        evento.isFree -> "Gratuito"
+        evento.price.isNotBlank() -> evento.price
+        else -> "Pago"
+    }
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+            .shadow(18.dp, RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(CulturamaCard)
+            .border(1.5.dp, CulturamaOrange.copy(alpha = 0.9f), RoundedCornerShape(20.dp))
+            .clickable(onClick = onVer)
     ) {
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(148.dp)
+                .height(96.dp)
         ) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color(corCategoriaMapa(evento.category))),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    letraDoMarcador(evento.category),
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        color = Color(corDoSimbolo(evento.category)),
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
             if (!evento.imageUrl.isNullOrBlank()) {
                 AsyncImage(
                     model = evento.imageUrl,
@@ -630,22 +794,14 @@ private fun CardMarcador(
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
-            } else {
-                EventCover(
-                    imageUrl = null,
-                    label = evento.title,
-                    emoji = eventsScreenEmoji(evento.category),
-                    gradient = eventsScreenGradient(evento.category),
-                    modifier = Modifier.fillMaxSize()
-                )
             }
             Box(
                 Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
+                    .height(42.dp)
                     .background(
                         Brush.verticalGradient(
-                            listOf(Color.Transparent, CulturamaCard.copy(alpha = 0.55f)),
-                            startY = 40f
+                            listOf(Color.Black.copy(alpha = 0.5f), Color.Transparent)
                         )
                     )
             )
@@ -653,20 +809,25 @@ private fun CardMarcador(
                 onClick = onFechar,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(8.dp)
-                    .size(36.dp)
+                    .padding(6.dp)
+                    .size(32.dp)
                     .clip(CircleShape)
                     .background(Color.Black.copy(alpha = 0.45f))
             ) {
-                Icon(Icons.Filled.Close, contentDescription = "Fechar", tint = Color.White, modifier = Modifier.size(18.dp))
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = "Fechar",
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
             }
             if (podeFavoritar) {
                 IconButton(
                     onClick = onFavorito,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .size(36.dp)
+                        .padding(6.dp)
+                        .size(32.dp)
                         .clip(CircleShape)
                         .background(Color.Black.copy(alpha = 0.45f))
                 ) {
@@ -674,79 +835,100 @@ private fun CardMarcador(
                         imageVector = if (favorito) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                         contentDescription = if (favorito) "Remover dos favoritos" else "Favoritar",
                         tint = if (favorito) CulturamaOrange else Color.White,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
         }
 
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
             Text(
                 evento.title,
-                style = MaterialTheme.typography.titleLarge.copy(
+                style = MaterialTheme.typography.titleMedium.copy(
                     color = TextPrimary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp
+                    fontWeight = FontWeight.Bold
                 ),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
             Row(
-                Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .border(1.dp, CulturamaOrange.copy(alpha = 0.7f), RoundedCornerShape(999.dp))
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     evento.category.ifBlank { "Cultura" },
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .clip(RoundedCornerShape(999.dp))
+                        .border(1.dp, CulturamaOrange.copy(alpha = 0.7f), RoundedCornerShape(999.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
                     style = MaterialTheme.typography.labelMedium.copy(
                         color = CulturamaOrange,
                         fontWeight = FontWeight.SemiBold
                     ),
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    entrada,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(if (evento.isFree) Color(0xFF1A3A28) else CulturamaOrange.copy(alpha = 0.16f))
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        color = if (evento.isFree) Color(0xFF8FE0B0) else CulturamaOrange,
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
             Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Filled.DateRange, null, tint = TextSecondary, modifier = Modifier.size(16.dp))
+                Icon(Icons.Filled.DateRange, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(15.dp))
                 Text(
                     "${evento.dayOfWeek.take(3)}, ${evento.dayOfMonth} de ${evento.monthAbbr.lowercase()} · ${evento.time}",
+                    modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            Spacer(Modifier.height(6.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Outlined.Place, null, tint = TextSecondary, modifier = Modifier.size(16.dp))
-                Text(
-                    bairroOuCidade(evento.venueName) ?: evento.venueName,
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                distanciaKm?.let {
-                    Text(
-                        textoDistancia(it),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(CulturamaBackground)
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall.copy(color = CulturamaOrange)
-                    )
+            if (local != null || distanciaKm != null) {
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (local != null) {
+                        Icon(Icons.Outlined.Place, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(15.dp))
+                        Text(
+                            local,
+                            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        Spacer(Modifier.weight(1f))
+                    }
+                    distanciaKm?.let {
+                        Text(
+                            textoDistancia(it),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(CulturamaBackground)
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                            style = MaterialTheme.typography.labelSmall.copy(color = CulturamaOrange)
+                        )
+                    }
                 }
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = onVer,
@@ -754,17 +936,23 @@ private fun CardMarcador(
                         containerColor = CulturamaOrange,
                         contentColor = Color.White
                     ),
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.weight(1f).height(48.dp)
-                ) { Text("Ver evento", fontWeight = FontWeight.SemiBold) }
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                    modifier = Modifier.weight(1f).height(42.dp)
+                ) {
+                    Text("Ver evento", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1)
+                }
                 OutlinedButton(
                     onClick = onRota,
                     enabled = evento.temCoordenadas,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(12.dp),
                     border = androidx.compose.foundation.BorderStroke(1.5.dp, CulturamaOrange),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = CulturamaOrange),
-                    modifier = Modifier.weight(1f).height(48.dp)
-                ) { Text("Como chegar", fontWeight = FontWeight.SemiBold) }
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                    modifier = Modifier.weight(1f).height(42.dp)
+                ) {
+                    Text("Como chegar", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1)
+                }
             }
         }
     }
