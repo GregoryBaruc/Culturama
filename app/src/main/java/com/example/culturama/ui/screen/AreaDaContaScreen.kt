@@ -40,7 +40,6 @@ import com.example.culturama.data.acesso.IntencaoDeAcesso
 import com.example.culturama.data.acesso.ResultadoDeAcesso
 import com.example.culturama.data.auth.SupabaseAuthService
 import com.example.culturama.navigation.Screen
-import com.example.culturama.navigation.SecaoDoUsuario
 import com.example.culturama.ui.theme.CulturamaBackground
 import com.example.culturama.ui.theme.CulturamaOrange
 import com.example.culturama.ui.theme.TextPrimary
@@ -77,6 +76,19 @@ fun AreaDaContaScreen(
     val titulo = if (intencao == IntencaoDeAcesso.EMPRESA) "Culturama Insights" else "Área do organizador"
     val autorizado = resultado == ResultadoDeAcesso.AUTORIZADO
 
+    if (intencao == IntencaoDeAcesso.ORGANIZADOR && autorizado) {
+        MuralDoOrganizadorScreen(
+            navController = navController,
+            nomeDaSessao = authService.contaAtual()?.nome,
+            onVoltar = {
+                if (!navController.popBackStack()) {
+                    navController.navigate(Screen.Organizers.route) { launchSingleTop = true }
+                }
+            }
+        )
+        return
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -109,26 +121,11 @@ fun AreaDaContaScreen(
                     CircularProgressIndicator(color = CulturamaOrange)
                     Text("Conferindo a permissão desta conta…", color = TextSecondary)
                 }
-                ResultadoDeAcesso.AUTORIZADO -> {
-                    if (intencao == IntencaoDeAcesso.ORGANIZADOR) {
-                        InicioDoOrganizador(authService.contaAtual()?.nome)
-                    } else {
-                        TextoAutorizado(intencao)
-                    }
-                }
+                ResultadoDeAcesso.AUTORIZADO -> TextoAutorizado(intencao)
                 else -> Text(
                     textoDoBloqueio(intencao, resultado!!),
                     style = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary)
                 )
-            }
-            if (autorizado && intencao == IntencaoDeAcesso.ORGANIZADOR) {
-                OutlinedButton(
-                    onClick = {
-                        navController.navigate(Screen.UserSection.createRoute(SecaoDoUsuario.EVENTOS.id))
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp)
-                ) { Text("Meus eventos") }
             }
             if (resultado != null && !autorizado && intencao != IntencaoDeAcesso.DESCOBERTA) {
                 OutlinedButton(
@@ -156,24 +153,6 @@ fun AreaDaContaScreen(
 }
 
 @Composable
-private fun InicioDoOrganizador(nomeDaConta: String?) {
-    Text(
-        "Situação: cadastro autorizado no servidor.",
-        style = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary, fontWeight = FontWeight.SemiBold)
-    )
-    if (!nomeDaConta.isNullOrBlank()) {
-        Text(
-            "Conta: $nomeDaConta",
-            style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary)
-        )
-    }
-    Text(
-        "O nome do coletivo não vem nesta consulta. O mural para criar, editar e publicar eventos entra numa próxima etapa.",
-        style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary)
-    )
-}
-
-@Composable
 private fun TextoAutorizado(intencao: IntencaoDeAcesso) {
     val texto = if (intencao == IntencaoDeAcesso.EMPRESA) {
         "Esta conta está aprovada como empresa. O painel de patrocínio e inteligência cultural entra numa próxima etapa."
@@ -197,7 +176,11 @@ private fun textoDoBloqueio(intencao: IntencaoDeAcesso, resultado: ResultadoDeAc
         ResultadoDeAcesso.AUSENTE ->
             "Esta conta não tem cadastro de $papel. O login não cria esse papel."
         ResultadoDeAcesso.INDETERMINADO ->
-            "Há um cadastro ligado a esta conta, mas o servidor não informou se ele está aprovado. O acesso permanece bloqueado."
+            if (intencao == IntencaoDeAcesso.ORGANIZADOR) {
+                "Há um cadastro de organizador ligado a esta conta, mas o servidor não informa se ele está aprovado. O mural permanece fechado até essa confirmação."
+            } else {
+                "Há um cadastro ligado a esta conta, mas o servidor não informou se ele está aprovado. O acesso permanece bloqueado."
+            }
         ResultadoDeAcesso.FALHA ->
             "Não foi possível confirmar a autorização. O acesso permanece bloqueado."
         ResultadoDeAcesso.AUTORIZADO -> ""
