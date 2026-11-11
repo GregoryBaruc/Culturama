@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -48,7 +49,12 @@ import com.example.culturama.data.acesso.CargaDoMural
 import com.example.culturama.data.acesso.EventoDoMural
 import com.example.culturama.data.acesso.MuralDoOrganizador
 import com.example.culturama.data.acesso.PerfilDoMural
+import com.example.culturama.data.acesso.ResumoDeOrganizacao
+import com.example.culturama.data.acesso.SituacaoCadastral
 import com.example.culturama.data.acesso.contagem
+import com.example.culturama.data.acesso.situacaoCadastral
+import com.example.culturama.data.admin.lerInstante
+import com.example.culturama.data.admin.textoDaData
 import com.example.culturama.navigation.Screen
 import com.example.culturama.ui.component.CulturamaIcons
 import com.example.culturama.ui.theme.CulturamaBackground
@@ -71,12 +77,28 @@ fun MuralDoOrganizadorScreen(
     comoAdministrador: Boolean = false
 ) {
     var carga by remember { mutableStateOf<CargaDoMural?>(null) }
+    var recarga by remember { mutableIntStateOf(0) }
     var secao by rememberSaveable { mutableStateOf(SecaoDoMural.INICIO.name) }
     var criarAberto by rememberSaveable { mutableStateOf(false) }
+    var avisoConvite by rememberSaveable { mutableStateOf(false) }
+    var organizacaoId by rememberSaveable { mutableStateOf<String?>(null) }
+    var trocando by rememberSaveable { mutableStateOf(false) }
+    var organizacoes by remember { mutableStateOf<List<ResumoDeOrganizacao>?>(null) }
+    var avisoLista by remember { mutableStateOf<String?>(null) }
     val atual = SecaoDoMural.entries.firstOrNull { it.name == secao } ?: SecaoDoMural.INICIO
 
-    LaunchedEffect(Unit) {
-        carga = MuralDoOrganizador.carregar()
+    LaunchedEffect(recarga, organizacaoId) {
+        carga = if (organizacaoId.isNullOrBlank()) {
+            MuralDoOrganizador.carregar()
+        } else {
+            MuralDoOrganizador.carregarComoAdministrador(organizacaoId!!)
+        }
+    }
+    LaunchedEffect(comoAdministrador) {
+        if (!comoAdministrador) return@LaunchedEffect
+        MuralDoOrganizador.listarParaAdministrador()
+            .onSuccess { organizacoes = it }
+            .onFailure { avisoLista = it.message }
     }
 
     val pronta = carga as? CargaDoMural.Pronta
@@ -111,6 +133,15 @@ fun MuralDoOrganizadorScreen(
                 style = MaterialTheme.typography.titleLarge.copy(color = TextPrimary, fontWeight = FontWeight.Bold)
             )
         }
+        if (comoAdministrador) {
+            val rotulo = organizacoes?.firstOrNull { it.id == (pronta?.perfil?.id ?: organizacaoId) }?.rotulo
+                ?: pronta?.perfil?.nomeDoResponsavel
+                ?: "Nenhuma organização selecionada"
+            FaixaAdministrador(rotulo) {
+                trocando = true
+                secao = SecaoDoMural.INICIO.name
+            }
+        }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -119,19 +150,42 @@ fun MuralDoOrganizadorScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            when (val estado = carga) {
+            if (comoAdministrador && trocando) {
+                SeletorDeOrganizacoes(
+                    itens = organizacoes,
+                    aviso = avisoLista,
+                    onEscolher = { id ->
+                        organizacaoId = id
+                        trocando = false
+                        secao = SecaoDoMural.INICIO.name
+                    }
+                )
+            } else when (val estado = carga) {
                 null -> {
                     CircularProgressIndicator(color = CulturamaOrange)
                     Text("Carregando o espaço cultural…", color = TextSecondary)
                 }
-                CargaDoMural.SemCadastro -> Text(
-                    if (comoAdministrador) {
-                        "Como administrador você já entrou na área. Esta conta ainda não tem organização vinculada; com o vínculo, o mural e a gestão de eventos ficam disponíveis aqui."
+                CargaDoMural.SemCadastro -> {
+                    if (comoAdministrador && organizacaoId == null) {
+                        Text(
+                            "Esta conta não tem organização própria. Escolha uma organização que o servidor autorizar. Nenhuma foi selecionada automaticamente.",
+                            color = TextPrimary
+                        )
+                        SeletorDeOrganizacoes(
+                            itens = organizacoes,
+                            aviso = avisoLista,
+                            onEscolher = { id ->
+                                organizacaoId = id
+                                secao = SecaoDoMural.INICIO.name
+                            }
+                        )
                     } else {
-                        "Esta conta não tem uma organização vinculada. O login não cria esse vínculo."
-                    },
-                    color = TextPrimary
-                )
+                        Text(
+                            "Esta conta não tem uma organização vinculada. O login não cria esse vínculo.",
+                            color = TextPrimary
+                        )
+                    }
+                }
                 is CargaDoMural.Falhou -> Text(estado.mensagem, color = TextPrimary)
                 is CargaDoMural.Pronta -> when (atual) {
                     SecaoDoMural.INICIO -> Inicio(
@@ -155,10 +209,16 @@ fun MuralDoOrganizadorScreen(
                         perfil = estado.perfil,
                         nomeDaSessao = nomeDaSessao
                     )
-                    SecaoDoMural.VERIFICACAO -> Verificacao(perfil = estado.perfil)
-                    SecaoDoMural.COLABORADORES -> TextoDeSecao(
-                        titulo = "Colaboradores",
-                        texto = "Em desenvolvimento. O servidor não tem um papel de colaborador ligado à organização. Esta tela não convida pessoas nem altera permissões."
+                    SecaoDoMural.VERIFICACAO -> Verificacao(
+                        perfil = estado.perfil,
+                        nomeDaSessao = nomeDaSessao,
+                        onAtualizar = { recarga++ }
+                    )
+                    SecaoDoMural.COLABORADORES -> Colaboradores(
+                        perfil = estado.perfil,
+                        nomeDaSessao = nomeDaSessao,
+                        avisoConvite = avisoConvite,
+                        onConvidar = { avisoConvite = true }
                     )
                 }
             }
@@ -177,7 +237,7 @@ private fun Inicio(
     onDescoberta: () -> Unit
 ) {
     val responsavel = perfil.nomeDoResponsavel ?: nomeDaSessao?.trim()?.takeIf { it.isNotEmpty() }
-    CabecalhoDaOrganizacao(responsavel)
+    CabecalhoDaOrganizacao(responsavel, situacaoCadastral(perfil.verificado, perfil.status))
     Text("Visão geral", style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary, fontWeight = FontWeight.Bold))
     if (eventos == null) {
         Cartao {
@@ -198,19 +258,11 @@ private fun Inicio(
             style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
         )
     }
-    Cartao {
-        Text("Colaboradores", color = TextPrimary, fontWeight = FontWeight.SemiBold)
-        Text(
-            "Em desenvolvimento. Não há consulta de pessoas vinculadas à organização.",
-            color = TextSecondary,
-            style = MaterialTheme.typography.bodyMedium
-        )
-    }
     Text("Áreas", style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary, fontWeight = FontWeight.Bold))
     Atalho(Icons.Filled.DateRange, "Meus eventos", "Eventos ligados a esta organização", { onSecao(SecaoDoMural.EVENTOS) })
     Atalho(CulturamaIcons.Groups, "Meu coletivo", "Dados que o servidor já envia", { onSecao(SecaoDoMural.COLETIVO) })
     Atalho(CulturamaIcons.VerifiedBadge, "Verificação", "Situação cadastral desta conta", { onSecao(SecaoDoMural.VERIFICACAO) })
-    Atalho(CulturamaIcons.Person, "Colaboradores", "Gestão de pessoas ainda sem suporte", { onSecao(SecaoDoMural.COLABORADORES) })
+    Atalho(CulturamaIcons.Person, "Colaboradores", "Vínculos da organização, quando existirem", { onSecao(SecaoDoMural.COLABORADORES) })
     Button(
         onClick = onCriar,
         modifier = Modifier.fillMaxWidth().height(50.dp),
@@ -225,7 +277,7 @@ private fun Inicio(
 }
 
 @Composable
-private fun CabecalhoDaOrganizacao(responsavel: String?) {
+private fun CabecalhoDaOrganizacao(responsavel: String?, situacao: SituacaoCadastral) {
     Cartao {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -259,7 +311,7 @@ private fun CabecalhoDaOrganizacao(responsavel: String?) {
             Text("O servidor não enviou o nome do responsável.", color = TextSecondary)
         }
         Text(
-            "Situação: aprovado para este espaço.",
+            "Situação cadastral: ${situacao.titulo}",
             color = CulturamaOrange,
             fontWeight = FontWeight.SemiBold
         )
@@ -277,39 +329,138 @@ private fun Coletivo(perfil: PerfilDoMural, nomeDaSessao: String?) {
     Dado("Tipo de documento", perfil.tipoDocumento?.let(::apresentarDocumento) ?: "O servidor não enviou o tipo de documento.")
     Dado("Localização", "O servidor não envia a localização.")
     Dado("Contatos públicos", "O servidor não envia contatos públicos.")
+    Dado("Imagem", "O servidor não envia logotipo nem imagem do coletivo.")
     Text(
-        "O número do documento não é exibido. Não há edição deste cadastro no aplicativo.",
+        "O número do documento não é exibido. A edição destes campos será disponibilizada quando o servidor autorizar a gravação. Esta tela não altera o cadastro.",
         color = TextSecondary,
         style = MaterialTheme.typography.bodySmall
     )
 }
 
 @Composable
-private fun Verificacao(perfil: PerfilDoMural) {
-    Text("Verificação", style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary, fontWeight = FontWeight.Bold))
+private fun Verificacao(
+    perfil: PerfilDoMural,
+    nomeDaSessao: String?,
+    onAtualizar: () -> Unit
+) {
+    val situacao = situacaoCadastral(perfil.verificado, perfil.status)
+    val responsavel = perfil.nomeDoResponsavel ?: nomeDaSessao?.trim()?.takeIf { it.isNotEmpty() }
+    val pedidoEm = lerInstante(perfil.criadoEm)?.let { textoDaData(it) }
+    Text(
+        "Verificação do meu coletivo",
+        style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary, fontWeight = FontWeight.Bold)
+    )
     Cartao {
-        Text("Aprovado", color = CulturamaOrange, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+        Text(situacao.titulo, color = CulturamaOrange, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+        Text(situacao.detalhe, color = TextSecondary)
+    }
+    Dado("Nome da organização", "O servidor não envia o nome do coletivo.")
+    Dado("Responsável", responsavel ?: "O servidor não enviou o nome do responsável.")
+    Dado(
+        "Data de solicitação",
+        pedidoEm ?: "O servidor não envia a data de solicitação."
+    )
+    Dado("Data de aprovação", "O servidor não envia a data de aprovação.")
+    Dado(
+        "Observações",
+        perfil.observacao ?: "Nenhuma observação veio nesta consulta."
+    )
+    Text("Documentação", style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary, fontWeight = FontWeight.Bold))
+    Dado(
+        "Situação da documentação",
+        "O servidor não envia arquivos. Só o tipo informado no cadastro está disponível: " +
+            (perfil.tipoDocumento?.let(::apresentarDocumento) ?: "não informado") + "."
+    )
+    Dado(
+        "Solicitação de correção",
+        perfil.observacao ?: "Nenhuma solicitação de correção veio nesta consulta."
+    )
+    Text(
+        "Nenhum documento pessoal ou empresarial é baixado, copiado ou exibido. O aplicativo não altera a verificação.",
+        color = TextSecondary,
+        style = MaterialTheme.typography.bodySmall
+    )
+    OutlinedButton(
+        onClick = onAtualizar,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp)
+    ) { Text("Atualizar consulta") }
+}
+
+@Composable
+private fun Colaboradores(
+    perfil: PerfilDoMural,
+    nomeDaSessao: String?,
+    avisoConvite: Boolean,
+    onConvidar: () -> Unit
+) {
+    val responsavel = perfil.nomeDoResponsavel ?: nomeDaSessao?.trim()?.takeIf { it.isNotEmpty() }
+    Text("Colaboradores", style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary, fontWeight = FontWeight.Bold))
+    Dado("Organização", "O servidor não envia o nome do coletivo.")
+    Dado("Responsável nesta conta", responsavel ?: "O servidor não enviou o nome do responsável.")
+    Cartao {
+        Text("Nenhum colaborador vinculado", color = TextPrimary, fontWeight = FontWeight.SemiBold)
         Text(
-            "Esta conta entrou porque o servidor marcou o organizador como verificado ou com status aprovado, verificado ou ativo.",
+            "O servidor não tem uma lista de pessoas ligadas a esta organização. Nenhum vínculo foi inventado.",
             color = TextSecondary
         )
     }
-    if (perfil.observacao != null) {
-        Dado("Observação do cadastro", perfil.observacao)
-    } else {
-        Dado("Observação do cadastro", "Nenhuma observação veio nesta consulta.")
+    OutlinedButton(
+        onClick = onConvidar,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp)
+    ) { Text("Convidar colaborador") }
+    if (avisoConvite) {
+        Cartao {
+            Text(
+                "Em desenvolvimento. O convite não é enviado e nenhum papel é concedido.",
+                color = TextSecondary
+            )
+        }
     }
     Text(
-        "Estados como em análise ou recusado ficam na entrada, antes deste mural. O aplicativo não altera a verificação.",
+        "Colaborador não é administrador nem moderador da plataforma. Esta tela não altera permissões.",
         color = TextSecondary,
         style = MaterialTheme.typography.bodySmall
     )
 }
 
 @Composable
-private fun TextoDeSecao(titulo: String, texto: String) {
-    Text(titulo, style = MaterialTheme.typography.titleMedium.copy(color = TextPrimary, fontWeight = FontWeight.Bold))
-    Cartao { Text(texto, color = TextSecondary) }
+private fun FaixaAdministrador(entidade: String, onTrocar: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text("Modo administrador", color = CulturamaOrange, fontWeight = FontWeight.SemiBold)
+        Text("Organização: $entidade", color = TextPrimary)
+        OutlinedButton(onClick = onTrocar, shape = RoundedCornerShape(14.dp)) {
+            Text("Trocar organização")
+        }
+    }
+}
+
+@Composable
+private fun SeletorDeOrganizacoes(
+    itens: List<ResumoDeOrganizacao>?,
+    aviso: String?,
+    onEscolher: (String) -> Unit
+) {
+    when {
+        itens == null && aviso == null -> Text("Consultando organizações…", color = TextSecondary)
+        aviso != null && itens.isNullOrEmpty() -> Text(aviso, color = TextPrimary)
+        itens.isNullOrEmpty() -> Text(
+            "O servidor não devolveu outras organizações para esta sessão. Nenhuma organização foi criada.",
+            color = TextSecondary
+        )
+        else -> itens.forEach { item ->
+            Cartao(onClick = { onEscolher(item.id) }) {
+                Text(item.rotulo, color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                Text(item.situacao, color = TextSecondary, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
 }
 
 @Composable

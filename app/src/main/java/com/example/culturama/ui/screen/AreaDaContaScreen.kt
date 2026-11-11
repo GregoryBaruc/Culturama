@@ -1,6 +1,7 @@
 package com.example.culturama.ui.screen
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -40,10 +42,14 @@ import com.example.culturama.data.acesso.IntencaoDeAcesso
 import com.example.culturama.data.acesso.ResultadoDeAcesso
 import com.example.culturama.data.acesso.comPrivilegioDeAdministrador
 import com.example.culturama.data.admin.AcessoAdministrativo
+import com.example.culturama.data.admin.EmpresaDoPainel
+import com.example.culturama.data.admin.EmpresasDoPainelRepository
 import com.example.culturama.data.admin.PapelNoPainel
+import com.example.culturama.data.admin.rotuloSituacao
 import com.example.culturama.data.auth.SupabaseAuthService
 import com.example.culturama.navigation.Screen
 import com.example.culturama.ui.theme.CulturamaBackground
+import com.example.culturama.ui.theme.CulturamaCard
 import com.example.culturama.ui.theme.CulturamaOrange
 import com.example.culturama.ui.theme.TextPrimary
 import com.example.culturama.ui.theme.TextSecondary
@@ -131,7 +137,13 @@ fun AreaDaContaScreen(
                     CircularProgressIndicator(color = CulturamaOrange)
                     Text("Conferindo a permissão desta conta…", color = TextSecondary)
                 }
-                ResultadoDeAcesso.AUTORIZADO -> TextoAutorizado(intencao, comoAdministrador)
+                ResultadoDeAcesso.AUTORIZADO -> {
+                    if (comoAdministrador && intencao == IntencaoDeAcesso.EMPRESA) {
+                        EmpresasDoAdministrador()
+                    } else {
+                        TextoAutorizado(intencao, comoAdministrador)
+                    }
+                }
                 else -> Text(
                     textoDoBloqueio(intencao, resultado!!),
                     style = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary)
@@ -158,6 +170,71 @@ fun AreaDaContaScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp)
             ) { Text("Abrir perfil") }
+        }
+    }
+}
+
+@Composable
+private fun EmpresasDoAdministrador() {
+    var empresas by remember { mutableStateOf<List<EmpresaDoPainel>?>(null) }
+    var aviso by remember { mutableStateOf<String?>(null) }
+    var escolhida by remember { mutableStateOf<String?>(null) }
+    var trocando by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        EmpresasDoPainelRepository.listar()
+            .onSuccess {
+                empresas = it
+                trocando = true
+            }
+            .onFailure { aviso = it.message }
+    }
+
+    Text("Modo administrador", color = CulturamaOrange, fontWeight = FontWeight.SemiBold)
+    val atual = empresas?.firstOrNull { it.id == escolhida }
+    Text(
+        "Empresa: ${atual?.razaoSocial ?: "Nenhuma empresa selecionada"}",
+        color = TextPrimary
+    )
+    if (!trocando && atual != null) {
+        Text(
+            "Culturama Insights desta empresa. O painel de patrocínio ainda não carrega indicadores próprios. Situação: ${atual.rotuloSituacao()}.",
+            color = TextPrimary
+        )
+        OutlinedButton(
+            onClick = { trocando = true },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp)
+        ) { Text("Trocar empresa") }
+    } else {
+        Text(
+            "Escolha a empresa que o servidor devolver para esta sessão. Nenhuma foi selecionada automaticamente.",
+            color = TextSecondary
+        )
+        when {
+            empresas == null && aviso == null -> Text("Consultando empresas…", color = TextSecondary)
+            aviso != null && empresas.isNullOrEmpty() -> Text(aviso!!, color = TextPrimary)
+            empresas.isNullOrEmpty() -> Text(
+                "O servidor não devolveu empresas para esta sessão. Nenhuma empresa foi criada.",
+                color = TextSecondary
+            )
+            else -> empresas?.forEach { empresa ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(CulturamaCard)
+                        .clickable {
+                            escolhida = empresa.id
+                            trocando = false
+                        }
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(empresa.razaoSocial, color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                    Text(empresa.rotuloSituacao(), color = TextSecondary)
+                }
+            }
         }
     }
 }

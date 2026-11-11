@@ -1,6 +1,8 @@
 package com.example.culturama.data.acesso
 
 import com.example.culturama.BuildConfig
+import com.example.culturama.data.admin.AcessoAdministrativo
+import com.example.culturama.data.admin.PapelNoPainel
 import com.example.culturama.data.admin.lerInstante
 import com.example.culturama.data.remote.SupabaseProvider
 import com.google.gson.Gson
@@ -17,9 +19,10 @@ import java.net.URLEncoder
  * Leitura do espaço do organizador da sessão.
  * Usa o JWT do usuário e a chave pública. Não grava, não cria vínculo e não usa service_role.
  *
- * Em `organizers` a consulta encontra id, user_id, documento, tipo_documento e observacao.
+ * Em `organizers` a consulta pede id, verificado, status, tipo_documento, observacao e,
+ * se a coluna existir, created_at. O número em `documento` não é pedido nem exibido.
  * Não há colunas de nome do coletivo, logo, descrição, endereço ou contato.
- * Não há tabela de colaboradores. O número do documento não é pedido nem exibido.
+ * Não há tabela de colaboradores nem envio de convite.
  */
 object MuralDoOrganizador {
 
@@ -36,14 +39,126 @@ object MuralDoOrganizador {
             CargaDoMural.Falhou("Não foi possível abrir o espaço cultural.")
         }
     }
+
+    /**
+     * Abre outra organização só se a sessão for administrador.
+     * A leitura usa o JWT da sessão. Se o RLS não devolver a linha, o mural não inventa dados.
+     */
+    suspend fun carregarComoAdministrador(organizacaoId: String): CargaDoMural = withContext(Dispatchers.IO) {
+        try {
+            if (!ehAdministrador()) {
+                return@withContext CargaDoMural.Falhou("Sem permissão para abrir outra organização.")
+            }
+            val perfil = lerPerfilPorId(organizacaoId.trim()) ?: return@withContext CargaDoMural.SemCadastro
+            CargaDoMural.Pronta(perfil, lerEventos(perfil.id))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            CargaDoMural.Falhou("Não foi possível abrir esta organização.")
+        }
+    }
+
+    /** Organizações que o JWT do administrador consegue ler. Lista vazia não cria cadastro. */
+    suspend fun listarParaAdministrador(): Result<List<ResumoDeOrganizacao>> = withContext(Dispatchers.IO) {
+        if (!ehAdministrador()) {
+            return@withContext Result.failure(IllegalStateException("Sem permissão para listar organizações."))
+        }
+        val selects = listOf(
+            "id,verificado,status,user:users(nome)",
+            "id,verificado,status"
+        )
+        for (select in selects) {
+            val resposta = pedir("organizers", "select=${enc(select)}&limit=50")
+            if (resposta.codigo == 400) continue
+            if (resposta.codigo !in 200..299) {
+                return@withContext Result.failure(
+                    IllegalStateException("A sessão não autorizou a lista de organizações.")
+                )
+            }
+            val linhas = Gson().fromJson(resposta.corpo, Array<LinhaPerfil>::class.java).orEmpty()
+            return@withContext Result.success(
+                linhas.mapNotNull { linha ->
+                    val id = linha.id?.trim().orEmpty()
+                    if (id.isEmpty()) null
+                    else ResumoDeOrganizacao(
+                        id = id,
+                        rotulo = rotuloDeOrganizacao(linha.user?.nome, id),
+                        situacao = situacaoCadastral(linha.verificado, linha.status).titulo
+                    )
+                }.distinctBy { it.id }
+            )
+        }
+        Result.failure(IllegalStateException("Não foi possível ler as organizações."))
+    }
 }
+
+data class ResumoDeOrganizacao(
+    val id: String,
+    val rotulo: String,
+    val situacao: String
+)
+
+/** Nome real do responsável, quando a consulta traz. Sem nome, um rótulo neutro com um trecho do id. */
+fun rotuloDeOrganizacao(nome: String?, id: String): String {
+    val limpo = nome?.trim()?.takeIf { it.isNotEmpty() }
+    if (limpo != null) return limpo
+    val trecho = id.trim().take(4).ifBlank { "----" }
+    return "Organização sem nome · $trecho"
+}
+
+private suspend fun ehAdministrador(): Boolean =
+    AcessoAdministrativo.verificar().getOrNull() == PapelNoPainel.ADMINISTRADOR
 
 data class PerfilDoMural(
     val id: String,
     val nomeDoResponsavel: String?,
     val tipoDocumento: String?,
-    val observacao: String?
+    val observacao: String?,
+    val verificado: Boolean? = null,
+    val status: String? = null,
+    /** `created_at` quando a coluna existe. Não é data de aprovação. */
+    val criadoEm: String? = null
 )
+
+/** Apresentação da verificação. Só mapeia marcas que o servidor já usa. */
+enum class SituacaoCadastral(val titulo: String, val detalhe: String) {
+    EM_ANALISE(
+        "Em análise",
+        "O cadastro foi enviado e aguarda avaliação da plataforma."
+    ),
+    APROVADO(
+        "Aprovado",
+        "O cadastro está verificado pela plataforma."
+    ),
+    AJUSTES(
+        "Ajustes necessários",
+        "O servidor pediu correção nas informações deste cadastro."
+    ),
+    RECUSADO(
+        "Recusado",
+        "A solicitação não foi aprovada."
+    ),
+    SEM_CONFIRMACAO(
+        "Sem confirmação",
+        "O servidor não informou a situação deste cadastro. Nada foi marcado como aprovado."
+    )
+}
+
+fun situacaoCadastral(verificado: Boolean?, status: String?): SituacaoCadastral {
+    val texto = status?.trim()?.lowercase()
+        ?.replace("ç", "c")
+        ?.replace("ã", "a")
+        ?.replace("á", "a")
+        .orEmpty()
+    val pedeAjuste = texto in setOf("ajuste", "ajustes", "correcao", "correcao_necessaria")
+    return when {
+        pedeAjuste -> SituacaoCadastral.AJUSTES
+        verificado == true || statusAutorizado(status) -> SituacaoCadastral.APROVADO
+        statusPendente(status) -> SituacaoCadastral.EM_ANALISE
+        statusRecusado(status) -> SituacaoCadastral.RECUSADO
+        else -> SituacaoCadastral.SEM_CONFIRMACAO
+    }
+}
 
 data class EventoDoMural(
     val id: String,
@@ -141,8 +256,11 @@ private fun semAcento(texto: String): String =
 
 private data class LinhaPerfil(
     val id: String? = null,
+    val verificado: Boolean? = null,
+    val status: String? = null,
     @SerializedName("tipo_documento") val tipoDocumento: String? = null,
     val observacao: String? = null,
+    @SerializedName("created_at") val createdAt: String? = null,
     val user: LinhaNome? = null
 )
 
@@ -165,6 +283,8 @@ private data class LinhaEvento(
 
 private fun lerPerfil(userId: String): PerfilDoMural? {
     val selects = listOf(
+        "id,verificado,status,tipo_documento,observacao,created_at,user:users(nome)",
+        "id,verificado,status,tipo_documento,observacao,user:users(nome)",
         "id,tipo_documento,observacao,user:users(nome)",
         "id,tipo_documento,observacao",
         "id"
@@ -175,15 +295,42 @@ private fun lerPerfil(userId: String): PerfilDoMural? {
         if (resposta.codigo !in 200..299) return null
         val linhas = Gson().fromJson(resposta.corpo, Array<LinhaPerfil>::class.java) ?: return null
         val linha = linhas.firstOrNull { !it.id.isNullOrBlank() } ?: return null
-        return PerfilDoMural(
-            id = linha.id!!.trim(),
-            nomeDoResponsavel = linha.user?.nome?.trim()?.takeIf { it.isNotEmpty() },
-            tipoDocumento = linha.tipoDocumento?.trim()?.takeIf { it.isNotEmpty() },
-            observacao = linha.observacao?.trim()?.takeIf { it.isNotEmpty() }
-        )
+        return perfilDe(linha)
     }
     return null
 }
+
+private fun lerPerfilPorId(organizacaoId: String): PerfilDoMural? {
+    if (organizacaoId.isBlank()) return null
+    val selects = listOf(
+        "id,verificado,status,tipo_documento,observacao,created_at,user:users(nome)",
+        "id,verificado,status,tipo_documento,observacao,user:users(nome)",
+        "id,tipo_documento,observacao",
+        "id"
+    )
+    for (select in selects) {
+        val resposta = pedir(
+            "organizers",
+            "id=eq.${enc(organizacaoId)}&select=${enc(select)}&limit=1"
+        )
+        if (resposta.codigo == 400) continue
+        if (resposta.codigo !in 200..299) return null
+        val linhas = Gson().fromJson(resposta.corpo, Array<LinhaPerfil>::class.java) ?: return null
+        val linha = linhas.firstOrNull { !it.id.isNullOrBlank() } ?: return null
+        return perfilDe(linha)
+    }
+    return null
+}
+
+private fun perfilDe(linha: LinhaPerfil) = PerfilDoMural(
+    id = linha.id!!.trim(),
+    nomeDoResponsavel = linha.user?.nome?.trim()?.takeIf { it.isNotEmpty() },
+    tipoDocumento = linha.tipoDocumento?.trim()?.takeIf { it.isNotEmpty() },
+    observacao = linha.observacao?.trim()?.takeIf { it.isNotEmpty() },
+    verificado = linha.verificado,
+    status = linha.status?.trim()?.takeIf { it.isNotEmpty() },
+    criadoEm = linha.createdAt?.trim()?.takeIf { it.isNotEmpty() }
+)
 
 private fun lerEventos(organizacaoId: String): List<EventoDoMural>? {
     val selects = listOf(

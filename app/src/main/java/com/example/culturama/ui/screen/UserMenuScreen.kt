@@ -248,7 +248,7 @@ fun UserMenuScreen(
             )
             if (papel == PapelNoPainel.ADMINISTRADOR) {
                 Text(
-                    text = "Administração",
+                    text = "Painéis de gerenciamento",
                     style = MaterialTheme.typography.titleMedium.copy(
                         color = TextSecondary,
                         fontWeight = FontWeight.SemiBold
@@ -258,23 +258,23 @@ fun UserMenuScreen(
                 AtalhoDoPerfil(
                     icone = Icons.Filled.Lock,
                     titulo = "Painel administrativo",
-                    resumo = "Visão geral do que está no ar",
+                    resumo = "Visão geral, eventos, anúncios e empresas",
                     onClick = {
                         navController.navigate(Screen.AdminPainel.createRoute(SecaoDoPainel.VISAO))
                     }
                 )
                 AtalhoDoPerfil(
                     icone = CulturamaIcons.Groups,
-                    titulo = "Área do organizador",
-                    resumo = "Abrir e usar o espaço cultural como admin",
+                    titulo = "Painel de organizadores",
+                    resumo = "Coletivos, eventos e verificação",
                     onClick = {
                         navController.navigate(Screen.AreaDaConta.createRoute(IntencaoDeAcesso.ORGANIZADOR.id))
                     }
                 )
                 AtalhoDoPerfil(
                     icone = Icons.Filled.Star,
-                    titulo = "Área empresarial",
-                    resumo = "Abrir e usar o Insights como admin",
+                    titulo = "Painel empresarial",
+                    resumo = "Culturama Insights e empresas",
                     onClick = {
                         navController.navigate(Screen.AreaDaConta.createRoute(IntencaoDeAcesso.EMPRESA.id))
                     }
