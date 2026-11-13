@@ -93,7 +93,10 @@ fun PlanosOrganizadorScreen(
         ) {
             IconButton(onClick = {
                 if (!navController.popBackStack()) {
-                    navController.navigate(Screen.Planos.route) { launchSingleTop = true }
+                    navController.navigate(Screen.Organizers.route) {
+                        popUpTo(Screen.PlanosOrganizador.route) { inclusive = true }
+                        launchSingleTop = true
+                    }
                 }
             }) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = TextPrimary)
@@ -171,7 +174,12 @@ fun PlanosOrganizadorScreen(
                 }
                 OutlinedButton(
                     onClick = {
-                        navController.navigate(Screen.Organizers.route) { launchSingleTop = true }
+                        if (!navController.popBackStack(Screen.Organizers.route, inclusive = false)) {
+                            navController.navigate(Screen.Organizers.route) {
+                                popUpTo(Screen.PlanosOrganizador.route) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
                     },
                     modifier = Modifier
                         .fillMaxWidth()

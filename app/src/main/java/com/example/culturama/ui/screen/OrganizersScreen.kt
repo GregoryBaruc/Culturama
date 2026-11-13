@@ -97,6 +97,10 @@ fun OrganizersScreen(
         }
     }
 
+    fun conhecerPlanos() {
+        navController.navigate(Screen.PlanosOrganizador.route) { launchSingleTop = true }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -115,7 +119,7 @@ fun OrganizersScreen(
                     navController.navigate(Screen.Home.route) { launchSingleTop = true }
                 }
             })
-            Apresentacao(onCadastrar = ::cadastrar, onEntrar = ::entrar)
+            Apresentacao(onCadastrar = ::cadastrar, onEntrar = ::entrar, onPlanos = ::conhecerPlanos)
             SecaoBeneficios()
             SecaoCenas(cenasPublicas)
             SecaoPassos()
@@ -145,7 +149,11 @@ private fun Cabecalho(onVoltar: () -> Unit) {
 }
 
 @Composable
-private fun Apresentacao(onCadastrar: () -> Unit, onEntrar: () -> Unit) {
+private fun Apresentacao(
+    onCadastrar: () -> Unit,
+    onEntrar: () -> Unit,
+    onPlanos: () -> Unit
+) {
     Column(
         modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -191,6 +199,11 @@ private fun Apresentacao(onCadastrar: () -> Unit, onEntrar: () -> Unit) {
             modifier = Modifier.fillMaxWidth().height(50.dp),
             shape = RoundedCornerShape(24.dp)
         ) { Text("Já sou organizador") }
+        OutlinedButton(
+            onClick = onPlanos,
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            shape = RoundedCornerShape(24.dp)
+        ) { Text("Conhecer planos") }
     }
 }
 

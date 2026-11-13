@@ -15,8 +15,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -51,9 +49,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -71,12 +73,12 @@ import com.example.culturama.ui.theme.CulturamaOrange
 import com.example.culturama.ui.theme.TextPrimary
 import com.example.culturama.ui.theme.TextSecondary
 import kotlinx.coroutines.launch
+import kotlin.math.max
 
 /** Quantidade de chips visíveis antes de pedir "Ver mais". */
 private const val LIMITE_CHIPS_COLAPSADOS = 8
 
 /** Escolha de categorias culturais já publicadas no catálogo do site. */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MeusInteressesScreen(
     navController: NavController,
@@ -232,10 +234,10 @@ fun MeusInteressesScreen(
                         }
                     }
 
-                    FlowRow(
+                    FluxoDeChips(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        espacoHorizontal = 8.dp,
+                        espacoVertical = 8.dp
                     ) {
                         opcoesVisiveis.forEach { opcao ->
                             val escolhida = opcao.id in selecionados
@@ -377,6 +379,79 @@ fun MeusInteressesScreen(
                     }
                 }
             )
+        }
+    }
+}
+
+/**
+ * Quebra os chips em linhas sem usar FlowRow.
+ * FlowRow, dentro da lista rolável, mede com altura infinita e fecha o app.
+ */
+@Composable
+private fun FluxoDeChips(
+    modifier: Modifier = Modifier,
+    espacoHorizontal: Dp = 8.dp,
+    espacoVertical: Dp = 8.dp,
+    content: @Composable () -> Unit
+) {
+    Layout(content = content, modifier = modifier) { measurables, constraints ->
+        if (measurables.isEmpty()) {
+            layout(constraints.minWidth, constraints.minHeight) {}
+        } else {
+            val larguraMaxima = if (constraints.hasBoundedWidth) constraints.maxWidth else 0
+            val folgaX = espacoHorizontal.roundToPx()
+            val folgaY = espacoVertical.roundToPx()
+            val limitesFilho = Constraints(maxWidth = larguraMaxima.coerceAtLeast(0))
+            val itens = measurables.map { it.measure(limitesFilho) }
+
+            val linhas = mutableListOf<List<Placeable>>()
+            val alturas = mutableListOf<Int>()
+            var linhaAtual = mutableListOf<Placeable>()
+            var larguraLinha = 0
+            var alturaLinha = 0
+
+            itens.forEach { item ->
+                val acrescimo = if (linhaAtual.isEmpty()) item.width else item.width + folgaX
+                val estoura = linhaAtual.isNotEmpty() && larguraMaxima > 0 && larguraLinha + acrescimo > larguraMaxima
+                if (estoura) {
+                    linhas += linhaAtual
+                    alturas += alturaLinha
+                    linhaAtual = mutableListOf(item)
+                    larguraLinha = item.width
+                    alturaLinha = item.height
+                } else {
+                    linhaAtual += item
+                    larguraLinha += acrescimo
+                    alturaLinha = max(alturaLinha, item.height)
+                }
+            }
+            if (linhaAtual.isNotEmpty()) {
+                linhas += linhaAtual
+                alturas += alturaLinha
+            }
+
+            val alturaConteudo = alturas.sum() + folgaY * (alturas.size - 1).coerceAtLeast(0)
+            val largura = if (constraints.hasBoundedWidth) {
+                constraints.maxWidth.coerceAtLeast(constraints.minWidth)
+            } else {
+                larguraLinha.coerceAtLeast(constraints.minWidth)
+            }
+            val altura = alturaConteudo.coerceIn(
+                constraints.minHeight,
+                if (constraints.hasBoundedHeight) constraints.maxHeight else alturaConteudo.coerceAtLeast(constraints.minHeight)
+            )
+
+            layout(largura, altura) {
+                var y = 0
+                linhas.forEachIndexed { indice, linha ->
+                    var x = 0
+                    linha.forEach { item ->
+                        item.placeRelative(x, y)
+                        x += item.width + folgaX
+                    }
+                    y += alturas[indice] + folgaY
+                }
+            }
         }
     }
 }

@@ -1,7 +1,9 @@
 package com.example.culturama.ui.screen
 
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
+import android.view.View
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -24,14 +26,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -65,6 +67,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -88,12 +91,18 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.culturama.data.auth.SupabaseAuthService
@@ -189,13 +198,50 @@ fun MapaEventosScreen(
     val ancora = remember { AncoraDoMarcador() }
     var alturaCabecalho by remember { mutableIntStateOf(0) }
     val densidade = LocalDensity.current
-    val reservaDoCabecalho = if (alturaCabecalho == 0) {
-        with(densidade) { 210.dp.roundToPx() }
-    } else {
-        alturaCabecalho
+    val view = LocalView.current
+    // Compose e a janela podem divergir no primeiro frame. O maior dos dois cobre a faixa real.
+    var plataformaTopo by remember { mutableIntStateOf(0) }
+    var plataformaFundo by remember { mutableIntStateOf(0) }
+    DisposableEffect(view) {
+        val janela = (view.context as? Activity)?.window
+        val controle = janela?.let { WindowCompat.getInsetsController(it, view) }
+        val statusAntes = controle?.isAppearanceLightStatusBars
+        val navAntes = controle?.isAppearanceLightNavigationBars
+        controle?.isAppearanceLightStatusBars = false
+        controle?.isAppearanceLightNavigationBars = false
+
+        fun lerInsets() {
+            val raiz = ViewCompat.getRootWindowInsets(view) ?: return
+            plataformaTopo = raiz.getInsets(
+                WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.displayCutout()
+            ).top
+            plataformaFundo = raiz.getInsets(
+                WindowInsetsCompat.Type.navigationBars() or WindowInsetsCompat.Type.displayCutout()
+            ).bottom
+        }
+
+        val aoLayout = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> lerInsets() }
+        view.addOnLayoutChangeListener(aoLayout)
+        view.post { lerInsets() }
+        onDispose {
+            view.removeOnLayoutChangeListener(aoLayout)
+            if (statusAntes != null) controle.isAppearanceLightStatusBars = statusAntes
+            if (navAntes != null) controle.isAppearanceLightNavigationBars = navAntes
+        }
     }
-    val limiteTopoPx = WindowInsets.statusBars.getTop(densidade) + reservaDoCabecalho +
-        with(densidade) { 8.dp.roundToPx() }
+    val topoPx = maxOf(
+        WindowInsets.statusBars.union(WindowInsets.displayCutout).getTop(densidade),
+        plataformaTopo
+    )
+    val fundoPx = maxOf(
+        WindowInsets.navigationBars.union(WindowInsets.displayCutout).getBottom(densidade),
+        plataformaFundo
+    )
+    val limiteTopoPx = if (alturaCabecalho > 0) {
+        alturaCabecalho + with(densidade) { 8.dp.roundToPx() }
+    } else {
+        topoPx + with(densidade) { 218.dp.roundToPx() }
+    }
     val usuario = usuarioLat.toDoubleOrNull()?.let { lat ->
         usuarioLon.toDoubleOrNull()?.let { lon -> Coordenada(lat, lon) }
     }
@@ -335,57 +381,63 @@ fun MapaEventosScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Camada de UI: logo no topo, eventos colados na base.
-        Column(
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-        ) {
+        // O mapa preenche a janela. O fundo do cabeçalho começa em y=0 e só o conteúdo
+        // recua pelo inset, senão os tiles aparecem atrás da barra de status.
+        Column(Modifier.fillMaxSize().zIndex(1f)) {
             Column(
                 Modifier
                     .fillMaxWidth()
                     .onSizeChanged { alturaCabecalho = it.height }
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                CulturamaBackground.copy(alpha = 0.97f),
-                                CulturamaBackground.copy(alpha = 0.78f),
-                                Color.Transparent
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(with(densidade) { topoPx.toDp() })
+                        .background(CulturamaBackground)
+                )
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                0f to CulturamaBackground,
+                                0.42f to CulturamaBackground.copy(alpha = 0.97f),
+                                0.72f to CulturamaBackground.copy(alpha = 0.78f),
+                                1f to Color.Transparent
                             )
                         )
+                ) {
+                    CabecalhoDoMapa(
+                        onMostrarLista = onMostrarLista,
+                        busca = busca,
+                        onBusca = { busca = it },
+                        rapido = rapido,
+                        onRapido = { escolhido ->
+                            rapido = if (escolhido == "Todos") "Todos" else escolhido
+                        },
+                        avancadoAtivo = filtro.avancadoAtivo,
+                        onMaisFiltros = { painelAberto = true },
+                        quantidade = comMapa.size,
+                        semResultado = filtro.temAlgum && comMapa.isEmpty(),
+                        onLimpar = {
+                            busca = ""
+                            rapido = "Todos"
+                            categoria = null
+                            subcategoria = null
+                            diaInicial = null
+                            diaFinal = null
+                            entrada = "Todos"
+                            somenteAcessivel = false
+                            raioKm = null
+                        }
                     )
-            ) {
-                CabecalhoDoMapa(
-                    onMostrarLista = onMostrarLista,
-                    busca = busca,
-                    onBusca = { busca = it },
-                    rapido = rapido,
-                    onRapido = { escolhido ->
-                        rapido = if (escolhido == "Todos") "Todos" else escolhido
-                    },
-                    avancadoAtivo = filtro.avancadoAtivo,
-                    onMaisFiltros = { painelAberto = true },
-                    quantidade = comMapa.size,
-                    semResultado = filtro.temAlgum && comMapa.isEmpty(),
-                    onLimpar = {
-                        busca = ""
-                        rapido = "Todos"
-                        categoria = null
-                        subcategoria = null
-                        diaInicial = null
-                        diaFinal = null
-                        entrada = "Todos"
-                        somenteAcessivel = false
-                        raioKm = null
+                    avisoLocal?.let {
+                        Text(
+                            text = it,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                        )
                     }
-                )
-                avisoLocal?.let {
-                    Text(
-                        text = it,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
-                    )
                 }
             }
 
@@ -393,6 +445,9 @@ fun MapaEventosScreen(
                 Modifier
                     .weight(1f)
                     .fillMaxWidth()
+                    .padding(
+                        bottom = if (selecionado != null) with(densidade) { fundoPx.toDp() } else 0.dp
+                    )
             ) {
                 Text(
                     text = "© OpenStreetMap contributors",
@@ -435,6 +490,7 @@ fun MapaEventosScreen(
                     itens = comMapa,
                     temLocalizacao = usuario != null,
                     podeAumentarRaio = usuario != null && raioKm != null && comMapa.isEmpty(),
+                    reservaInferior = with(densidade) { fundoPx.toDp() },
                     onAumentarRaio = { aumentarRaio() },
                     onSelecionar = { selecionarEvento(it) }
                 )
@@ -446,6 +502,7 @@ fun MapaEventosScreen(
                 evento = eventoSel,
                 ancora = ancora,
                 limiteTopoPx = limiteTopoPx,
+                limiteFundoPx = fundoPx,
                 distanciaKm = comMapa.firstOrNull { it.first.id == eventoSel.id }?.second,
                 favorito = userId?.let { favoritosRepo.ids(it).contains(eventoSel.id) } == true,
                 podeFavoritar = userId != null,
@@ -651,6 +708,7 @@ private fun CardFlutuanteDoMapa(
     evento: EventModel,
     ancora: AncoraDoMarcador,
     limiteTopoPx: Int,
+    limiteFundoPx: Int,
     distanciaKm: Double?,
     favorito: Boolean,
     podeFavoritar: Boolean,
@@ -670,7 +728,7 @@ private fun CardFlutuanteDoMapa(
             else -> 300.dp
         }
         val larguraPx = with(density) { largura.roundToPx() }
-        val basePx = constraints.maxHeight - WindowInsets.navigationBars.getBottom(density) - margemPx
+        val basePx = constraints.maxHeight - limiteFundoPx - margemPx
         var alturaPx by remember(evento.id) { mutableIntStateOf(0) }
         val folga = ancora.raioPx + with(density) { 8.dp.toPx() }
         val acima = alturaPx == 0 || ponto.y - alturaPx - folga >= limiteTopoPx
@@ -963,6 +1021,7 @@ private fun PainelProximos(
     itens: List<Pair<EventModel, Double?>>,
     temLocalizacao: Boolean,
     podeAumentarRaio: Boolean,
+    reservaInferior: Dp,
     onAumentarRaio: () -> Unit,
     onSelecionar: (EventModel) -> Unit
 ) {
@@ -971,7 +1030,7 @@ private fun PainelProximos(
             .fillMaxWidth()
             .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
             .background(CulturamaCard)
-            .padding(top = 8.dp, bottom = 14.dp)
+            .padding(top = 8.dp, bottom = 14.dp + reservaInferior)
     ) {
         Box(
             Modifier

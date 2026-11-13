@@ -151,8 +151,12 @@ fun HomeScreen(navController: NavController) {
                     else Screen.Access.route
                 )
             },
-            onOrganizersClick = { navController.navigate(Screen.PlanosOrganizador.route) },
-            onCompaniesClick  = { navController.navigate(Screen.PlanosEmpresa.route) },
+            onOrganizersClick = {
+                navController.navigate(Screen.Organizers.route) { launchSingleTop = true }
+            },
+            onCompaniesClick = {
+                navController.navigate(Screen.ParaEmpresas.route) { launchSingleTop = true }
+            },
             onLoginClick      = { navController.navigate(Screen.Acessos.route) },
             onSignUpClick     = { navController.navigate(Screen.SignUp.route) },
             onPreferencesClick= {

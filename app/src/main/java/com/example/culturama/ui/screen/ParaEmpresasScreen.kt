@@ -92,6 +92,10 @@ fun ParaEmpresasScreen(
         }
     }
 
+    fun conhecerPlanos() {
+        navController.navigate(Screen.PlanosEmpresa.route) { launchSingleTop = true }
+    }
+
     fun abrirFonte(url: String) {
         try {
             contexto.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
@@ -118,7 +122,7 @@ fun ParaEmpresasScreen(
                     navController.navigate(Screen.Home.route) { launchSingleTop = true }
                 }
             })
-            Apresentacao(onCadastrar = ::cadastrar, onEntrar = ::entrar)
+            Apresentacao(onCadastrar = ::cadastrar, onEntrar = ::entrar, onPlanos = ::conhecerPlanos)
             SecaoMercado(onFonte = ::abrirFonte)
             SecaoMedicao()
             SecaoInsights()
@@ -149,7 +153,11 @@ private fun Cabecalho(onVoltar: () -> Unit) {
 }
 
 @Composable
-private fun Apresentacao(onCadastrar: () -> Unit, onEntrar: () -> Unit) {
+private fun Apresentacao(
+    onCadastrar: () -> Unit,
+    onEntrar: () -> Unit,
+    onPlanos: () -> Unit
+) {
     Column(
         modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -199,6 +207,13 @@ private fun Apresentacao(onCadastrar: () -> Unit, onEntrar: () -> Unit) {
                 .height(50.dp),
             shape = RoundedCornerShape(24.dp)
         ) { Text("Já sou empresa") }
+        OutlinedButton(
+            onClick = onPlanos,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp),
+            shape = RoundedCornerShape(24.dp)
+        ) { Text("Conhecer planos") }
     }
 }
 

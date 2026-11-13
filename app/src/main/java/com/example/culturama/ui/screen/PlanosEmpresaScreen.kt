@@ -77,7 +77,12 @@ fun PlanosEmpresaScreen(
         when (acao) {
             AcaoDoPlano.CADASTRO_EMPRESA -> cadastrar()
             AcaoDoPlano.CONHECER_EMPRESAS -> {
-                navController.navigate(Screen.ParaEmpresas.route) { launchSingleTop = true }
+                if (!navController.popBackStack(Screen.ParaEmpresas.route, inclusive = false)) {
+                    navController.navigate(Screen.ParaEmpresas.route) {
+                        popUpTo(Screen.PlanosEmpresa.route) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
             }
             else -> Unit
         }
@@ -98,7 +103,10 @@ fun PlanosEmpresaScreen(
         ) {
             IconButton(onClick = {
                 if (!navController.popBackStack()) {
-                    navController.navigate(Screen.Planos.route) { launchSingleTop = true }
+                    navController.navigate(Screen.ParaEmpresas.route) {
+                        popUpTo(Screen.PlanosEmpresa.route) { inclusive = true }
+                        launchSingleTop = true
+                    }
                 }
             }) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = TextPrimary)
@@ -195,7 +203,12 @@ fun PlanosEmpresaScreen(
                 }
                 OutlinedButton(
                     onClick = {
-                        navController.navigate(Screen.ParaEmpresas.route) { launchSingleTop = true }
+                        if (!navController.popBackStack(Screen.ParaEmpresas.route, inclusive = false)) {
+                            navController.navigate(Screen.ParaEmpresas.route) {
+                                popUpTo(Screen.PlanosEmpresa.route) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
