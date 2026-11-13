@@ -151,14 +151,14 @@ fun HomeScreen(navController: NavController) {
                     else Screen.Access.route
                 )
             },
-            onOrganizersClick = { navController.navigate(Screen.Organizers.route) },
-            onCompaniesClick  = { navController.navigate(Screen.ParaEmpresas.route) },
+            onOrganizersClick = { navController.navigate(Screen.PlanosOrganizador.route) },
+            onCompaniesClick  = { navController.navigate(Screen.PlanosEmpresa.route) },
             onLoginClick      = { navController.navigate(Screen.Acessos.route) },
             onSignUpClick     = { navController.navigate(Screen.SignUp.route) },
             onPreferencesClick= {
                 navController.navigate(Screen.UserSection.createRoute(SecaoDoUsuario.INTERESSES.id))
             },
-            onAcessosClick    = { navController.navigate(Screen.Acessos.route) },
+            onPlanosClick     = { navController.navigate(Screen.Planos.route) },
 
             isLoggedIn        = isLoggedIn,
             onLogoutClick     = { coroutineScope.launch { authService.logout() } },

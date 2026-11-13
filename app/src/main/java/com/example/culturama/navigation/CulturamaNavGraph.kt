@@ -32,6 +32,9 @@ import com.example.culturama.ui.screen.ModeracaoScreen
 import com.example.culturama.ui.screen.OrganizerAccessScreen
 import com.example.culturama.ui.screen.OrganizersScreen
 import com.example.culturama.ui.screen.ParaEmpresasScreen
+import com.example.culturama.ui.screen.PlanosEmpresaScreen
+import com.example.culturama.ui.screen.PlanosOrganizadorScreen
+import com.example.culturama.ui.screen.PlanosScreen
 import com.example.culturama.ui.screen.PreferencesScreen
 import com.example.culturama.ui.screen.EventsScreen
 import com.example.culturama.ui.screen.EventDetailScreen
@@ -113,6 +116,15 @@ fun CulturamaNavGraph(navController: NavHostController) {
         }
         composable(Screen.ParaEmpresas.route) {
             ParaEmpresasScreen(navController = navController)
+        }
+        composable(Screen.Planos.route) {
+            PlanosScreen(navController = navController)
+        }
+        composable(Screen.PlanosOrganizador.route) {
+            PlanosOrganizadorScreen(navController = navController)
+        }
+        composable(Screen.PlanosEmpresa.route) {
+            PlanosEmpresaScreen(navController = navController)
         }
         composable(Screen.OrganizerAccess.route) {
             OrganizerAccessScreen(navController = navController)

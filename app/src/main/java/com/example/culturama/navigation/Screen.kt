@@ -17,6 +17,9 @@ sealed class Screen(val route: String) {
     object Organizers      : Screen("organizers")
     object ParaEmpresas    : Screen("para_empresas")
     object OrganizerAccess : Screen("organizer_access")
+    object Planos          : Screen("planos")
+    object PlanosOrganizador : Screen("planos_organizador")
+    object PlanosEmpresa   : Screen("planos_empresa")
     object Login           : Screen("login") {
         fun createRoute(registeredEmail: String? = null, destino: String? = null): String {
             val params = mutableListOf<String>()
@@ -27,6 +30,7 @@ sealed class Screen(val route: String) {
             return if (params.isEmpty()) "login" else "login?${params.joinToString("&")}"
         }
     }
+    /** Hub legado de papéis (login). O menu principal aponta para [Planos]. */
     object Acessos         : Screen("acessos") {
         fun createRoute(foco: String = ""): String =
             if (foco.isBlank()) "acessos" else "acessos?foco=${Uri.encode(foco)}"
