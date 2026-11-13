@@ -13,3 +13,9 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Assinatura de release. Senha e keystore nunca entram no Git.
+*.jks
+*.keystore
+keystore.properties
+/app/release/

@@ -6,6 +6,15 @@ val locais = Properties().apply {
     if (arquivo.exists()) arquivo.inputStream().use { load(it) }
 }
 
+// Senha e caminho do keystore ficam fora do git. Sem esse arquivo o release não é assinado.
+val assinatura = Properties().apply {
+    val arquivo = rootProject.file("keystore.properties")
+    if (arquivo.exists()) arquivo.inputStream().use { load(it) }
+}
+val arquivoDaLoja = assinatura.getProperty("storeFile")?.let { rootProject.file(it) }
+val temAssinatura = arquivoDaLoja?.isFile == true &&
+    listOf("storePassword", "keyAlias", "keyPassword").all { !assinatura.getProperty(it).isNullOrBlank() }
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -22,7 +31,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0-beta"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -32,8 +41,21 @@ android {
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${locais.getProperty("SUPABASE_PUBLISHABLE_KEY", "")}\"")
     }
 
+    signingConfigs {
+        if (temAssinatura) {
+            create("release") {
+                storeFile = arquivoDaLoja
+                storePassword = assinatura.getProperty("storePassword")
+                keyAlias = assinatura.getProperty("keyAlias")
+                keyPassword = assinatura.getProperty("keyPassword")
+            }
+        }
+    }
     buildTypes {
         release {
+            if (temAssinatura) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
